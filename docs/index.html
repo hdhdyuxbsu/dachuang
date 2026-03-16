@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧农业云监测平台</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#05080f;--card:rgba(255,255,255,.03);--card-b:rgba(255,255,255,.06);
+  --t1:#eef2ff;--t2:rgba(255,255,255,.5);--t3:rgba(255,255,255,.25);
+  --green:#00d97e;--blue:#3b82f6;--orange:#f59e0b;--red:#ef4444;
+  --purple:#a855f7;--cyan:#06b6d4;--pink:#ec4899;--indigo:#6366f1;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse at 20% 0%,rgba(99,102,241,.08) 0%,transparent 50%),
+             radial-gradient(ellipse at 80% 100%,rgba(0,217,126,.05) 0%,transparent 50%),
+             radial-gradient(ellipse at 50% 50%,rgba(59,130,246,.03) 0%,transparent 70%);
+  pointer-events:none;z-index:0}
+
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+
+/* Header */
+.hdr{text-align:center;padding:40px 20px 10px}
+.hdr .logo{font-size:2.2em;font-weight:800;letter-spacing:-1px;
+  background:linear-gradient(135deg,var(--green),var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr .sub{color:var(--t3);font-size:.82em;margin-top:8px;font-weight:300;letter-spacing:2px;text-transform:uppercase}
+.status-row{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px;
+  padding:8px 20px;border-radius:30px;background:var(--card);border:1px solid var(--card-b);display:inline-flex}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.stxt{font-size:.72em;color:var(--t2);font-weight:400}
+.cloud-tag{font-size:.6em;padding:2px 8px;border-radius:6px;background:rgba(99,102,241,.15);color:var(--indigo);font-weight:600;margin-left:4px}
+
+/* Sections */
+.sec{margin-top:28px}
+.sec-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.badge{padding:4px 12px;border-radius:8px;font-size:.65em;font-weight:700;letter-spacing:1px}
+.b-env{background:rgba(59,130,246,.1);color:var(--blue)}
+.b-soil{background:rgba(0,217,126,.1);color:var(--green)}
+.b-npk{background:rgba(245,158,11,.1);color:var(--orange)}
+.b-chart{background:rgba(168,85,247,.1);color:var(--purple)}
+.sec-label{font-size:.8em;color:var(--t3);font-weight:500}
+
+/* Cards Grid */
+.g{display:grid;gap:10px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:700px){.g4,.g3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:400px){.g4,.g3{grid-template-columns:1fr}}
+
+.c{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:18px 16px;
+  position:relative;overflow:hidden;transition:all .25s ease}
+.c:hover{background:rgba(255,255,255,.05);transform:translateY(-1px);box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.c .top{display:flex;align-items:center;justify-content:space-between}
+.c .lbl{font-size:.68em;color:var(--t3);font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.c .ic{font-size:1.2em;opacity:.3}
+.c .val{font-size:2em;font-weight:700;margin:10px 0 4px;line-height:1}
+.c .unit{font-size:.68em;color:var(--t3);font-weight:400}
+.c .bar{position:absolute;bottom:0;left:0;right:0;height:2px}
+.bar-b{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.bar-o{background:linear-gradient(90deg,var(--orange),var(--red))}
+.bar-g{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.bar-p{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.bar-i{background:linear-gradient(90deg,var(--indigo),var(--blue))}
+
+/* Value colors per type */
+.v-warm{color:#fb923c}.v-cool{color:#38bdf8}.v-green{color:#4ade80}.v-purple{color:#c084fc}
+.v-cyan{color:#22d3ee}.v-yellow{color:#facc15}.v-pink{color:#f472b6}
+
+/* Chart */
+.chart-sec{margin-top:28px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:7px 18px;border-radius:10px;font-size:.72em;font-weight:500;cursor:pointer;
+  background:var(--card);border:1px solid var(--card-b);color:var(--t3);transition:all .2s}
+.tab:hover{color:var(--t2);background:rgba(255,255,255,.05)}
+.tab.on{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.25);color:var(--indigo)}
+.ch-box{background:var(--card);border:1px solid var(--card-b);border-radius:14px;padding:20px}
+.ch-box canvas{width:100%!important;height:260px!important}
+
+/* Time label */
+.time-row{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:0 2px}
+.time-lbl{font-size:.65em;color:var(--t3)}
+
+/* Footer */
+.ftr{text-align:center;margin-top:32px;padding-top:20px;border-top:1px solid var(--card-b)}
+.ftr p{font-size:.65em;color:var(--t3);line-height:2}
+
+/* Loading */
+.loading{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;transition:opacity .5s}
+.loading.hide{opacity:0;pointer-events:none}
+.spinner{width:36px;height:36px;border:3px solid var(--card-b);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{font-size:.8em;color:var(--t2)}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loader">
+  <div class="spinner"></div>
+  <p>Connecting to OneNet Cloud...</p>
+</div>
+
+<div class="wrap">
+  <div class="hdr">
+    <div class="logo">Smart Agriculture</div>
+    <div class="sub">Cloud Monitoring Platform</div>
+    <div style="margin-top:16px">
+      <span class="status-row">
+        <span class="dot" id="dot"></span>
+        <span class="stxt" id="stxt">Connecting...</span>
+        <span class="cloud-tag">CLOUD</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-row"><span class="badge b-env">ENV</span><span class="sec-label">Environmental Parameters</span></div>
+    <div class="g g4">
+      <div class="c"><div class="top"><span class="lbl">Light</span><span class="ic">&#9728;</span></div><div class="val v-yellow" id="lux">--</div><div class="unit">lux</div><div class="bar bar-b"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Temperature</span><span class="ic">&#127777;</span></div><div class="val v-warm" id="env_temp">--</div><div class="unit">&#8451;</div><div class="bar bar-o"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Humidity</span><span class="ic">&#128167;</span></div><div class="val v-cool" id="env_humi">--</div><div class="unit">%</div><div class="bar bar-b"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Pressure</span><span class="ic">&#127744;</span></div><div class="val v-purple" id="press">--</div><div class="unit">hPa</div><div class="bar bar-p"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-row"><span class="badge b-soil">SOIL</span><span class="sec-label">Soil Parameters</span></div>
+    <div class="g g3">
+      <div class="c"><div class="top"><span class="lbl">Soil Temp</span><span class="ic">&#127777;</span></div><div class="val v-warm" id="soil_temp">--</div><div class="unit">&#8451;</div><div class="bar bar-o"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Soil Moisture</span><span class="ic">&#128167;</span></div><div class="val v-green" id="soil_humi">--</div><div class="unit">%</div><div class="bar bar-g"></div></div>
+      <div class="c"><div class="top"><span class="lbl">pH Level</span><span class="ic">&#129514;</span></div><div class="val v-cyan" id="ph">--</div><div class="unit">pH</div><div class="bar bar-i"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-row"><span class="badge b-npk">NPK</span><span class="sec-label">Soil Nutrients</span></div>
+    <div class="g g3">
+      <div class="c"><div class="top"><span class="lbl">Nitrogen</span><span class="ic">N</span></div><div class="val v-green" id="n">--</div><div class="unit">mg/kg</div><div class="bar bar-g"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Phosphorus</span><span class="ic">P</span></div><div class="val v-cool" id="p">--</div><div class="unit">mg/kg</div><div class="bar bar-b"></div></div>
+      <div class="c"><div class="top"><span class="lbl">Potassium</span><span class="ic">K</span></div><div class="val v-warm" id="k">--</div><div class="unit">mg/kg</div><div class="bar bar-o"></div></div>
+    </div>
+  </div>
+
+  <div class="chart-sec">
+    <div class="sec-row"><span class="badge b-chart">HISTORY</span><span class="sec-label">24h Trend</span></div>
+    <div class="tabs">
+      <div class="tab on" onclick="swTab(0)">Temperature</div>
+      <div class="tab" onclick="swTab(1)">Humidity</div>
+      <div class="tab" onclick="swTab(2)">Light</div>
+      <div class="tab" onclick="swTab(3)">pH</div>
+    </div>
+    <div class="ch-box"><canvas id="chart"></canvas></div>
+  </div>
+
+  <div class="time-row">
+    <span class="time-lbl" id="update_time">Last update: --</span>
+    <span class="time-lbl">Auto refresh: 10s</span>
+  </div>
+
+  <div class="ftr">
+    <p>Smart Agriculture IoT &middot; ESP32 + LoRa + OneNet Cloud</p>
+    <p>Data source: China Mobile OneNet IoT Platform</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+/* ====== OneNet Config ====== */
+var CFG = {
+  pid: 'W9BY3SlO8w',
+  dev: 'dachuang',
+  key: 'aDFIWDNUeFpLTTdUTzdCS1VzdWlyV3JLS3pnR2tkdVU=',
+  et: '4102444800',
+  ver: '2018-10-31',
+  proxy: 'https://corsproxy.io/?'
+};
+var API_BASE = 'https://iot-api.heclouds.com';
+var token = '';
+var curTab = 0, chart = null, histCache = {};
+
+/* ====== Token Generation (Web Crypto API) ====== */
+function b64dec(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0)});}
+function b64enc(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
+
+async function genToken(){
+  var res = 'products/'+CFG.pid+'/devices/'+CFG.dev;
+  var sts = CFG.et+'\nsha256\n'+res+'\n'+CFG.ver;
+  var keyRaw = b64dec(CFG.key);
+  var cryptoKey = await crypto.subtle.importKey('raw',keyRaw,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  var sig = await crypto.subtle.sign('HMAC',cryptoKey,new TextEncoder().encode(sts));
+  var signB64 = b64enc(sig);
+  return 'version='+CFG.ver+'&res='+encodeURIComponent(res)+'&et='+CFG.et+'&method=sha256&sign='+encodeURIComponent(signB64);
+}
+
+/* ====== API Calls ====== */
+function apiUrl(path,params){
+  var url = API_BASE+path+'?product_id='+CFG.pid+'&device_name='+CFG.dev;
+  if(params) url += '&'+params;
+  return CFG.proxy+encodeURIComponent(url);
+}
+
+async function fetchLatest(){
+  var resp = await fetch(apiUrl('/thingmodel/query-device-property'),{
+    headers:{'authorization':token}
+  });
+  var json = await resp.json();
+  return json;
+}
+
+async function fetchHistory(identifier){
+  var resp = await fetch(apiUrl('/thingmodel/query-device-property-history','identifier='+identifier),{
+    headers:{'authorization':token}
+  });
+  var json = await resp.json();
+  return json;
+}
+
+/* ====== UI Update ====== */
+function setVal(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
+
+function updateUI(data){
+  if(!data||!data.data) return;
+  var d = data.data;
+  var props = ['lux','env_temp','env_humi','press','soil_temp','soil_humi','ph','n','p','k'];
+  for(var i=0;i<props.length;i++){
+    var key = props[i];
+    if(d[key] && d[key].value !== undefined){
+      var v = d[key].value;
+      if(key==='lux') setVal(key, parseFloat(v).toFixed(1));
+      else if(key==='ph') setVal(key, parseFloat(v).toFixed(2));
+      else if(key==='n'||key==='p'||key==='k') setVal(key, Math.round(v));
+      else setVal(key, parseFloat(v).toFixed(1));
+    }
+  }
+  document.getElementById('dot').className='dot on';
+  document.getElementById('stxt').textContent='Online';
+  document.getElementById('update_time').textContent='Last update: '+new Date().toLocaleTimeString();
+}
+
+/* ====== Chart ====== */
+var tabCfg = [
+  {ids:['env_temp','soil_temp'],labels:['Env Temp (°C)','Soil Temp (°C)'],colors:['#f59e0b','#ef4444']},
+  {ids:['env_humi','soil_humi'],labels:['Env Humidity (%)','Soil Moisture (%)'],colors:['#3b82f6','#00d97e']},
+  {ids:['lux'],labels:['Light (lx)'],colors:['#06b6d4']},
+  {ids:['ph'],labels:['pH'],colors:['#a855f7']}
+];
+
+function fmtHour(ts){var d=new Date(ts);return d.getHours()+':'+('0'+d.getMinutes()).slice(-2);}
+
+function buildChart(){
+  var cfg = tabCfg[curTab];
+  var datasets = [];
+  var labels = [];
+  for(var i=0;i<cfg.ids.length;i++){
+    var id = cfg.ids[i];
+    var hd = histCache[id];
+    if(!hd||!hd.length) continue;
+    if(labels.length===0) labels = hd.map(function(p){return fmtHour(p.time);});
+    datasets.push({
+      label:cfg.labels[i],
+      data:hd.map(function(p){return p.value;}),
+      borderColor:cfg.colors[i],
+      backgroundColor:function(ctx){
+        var g=ctx.chart.ctx.createLinearGradient(0,0,0,260);
+        var c=cfg.colors[datasets.length-1]||cfg.colors[0];
+        g.addColorStop(0,c+'25');g.addColorStop(1,c+'00');return g;
+      },
+      fill:true,tension:0.4,borderWidth:2,pointRadius:0,pointHoverRadius:3
+    });
+  }
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('chart'),{
+    type:'line',data:{labels:labels,datasets:datasets},
+    options:{
+      animation:{duration:300},responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{color:'rgba(255,255,255,.4)',boxWidth:10,padding:14,font:{size:11,family:'Inter'}}}},
+      scales:{
+        x:{ticks:{maxTicksLimit:8,color:'rgba(255,255,255,.2)',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'},border:{color:'transparent'}},
+        y:{ticks:{color:'rgba(255,255,255,.2)',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'},border:{color:'transparent'}}
+      }
+    }
+  });
+}
+
+function swTab(i){
+  curTab=i;
+  var tabs=document.querySelectorAll('.tab');
+  for(var j=0;j<tabs.length;j++) tabs[j].className='tab'+(j===i?' on':'');
+  buildChart();
+}
+
+/* ====== History Fetch ====== */
+async function loadHistory(){
+  var ids = ['env_temp','soil_temp','env_humi','soil_humi','lux','ph'];
+  for(var i=0;i<ids.length;i++){
+    try{
+      var resp = await fetchHistory(ids[i]);
+      if(resp && resp.code===0 && resp.data && resp.data.datapoints){
+        histCache[ids[i]] = resp.data.datapoints;
+      }
+    }catch(e){}
+  }
+  buildChart();
+}
+
+/* ====== Main Loop ====== */
+async function init(){
+  try{
+    token = await genToken();
+    var data = await fetchLatest();
+    updateUI(data);
+    document.getElementById('loader').classList.add('hide');
+    await loadHistory();
+  }catch(e){
+    document.getElementById('stxt').textContent='Connection failed';
+    document.getElementById('loader').classList.add('hide');
+    console.error('Init error:',e);
+  }
+}
+
+async function poll(){
+  try{
+    var data = await fetchLatest();
+    updateUI(data);
+  }catch(e){
+    document.getElementById('dot').className='dot';
+    document.getElementById('stxt').textContent='Offline';
+  }
+}
+
+init();
+setInterval(poll,10000);
+setInterval(loadHistory,60000);
+</script>
+</body>
+</html>

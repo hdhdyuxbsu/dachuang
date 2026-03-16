@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧农业监测平台</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e17;--card:rgba(255,255,255,.04);--card-b:rgba(255,255,255,.08);
+  --t1:#f0f4ff;--t2:rgba(255,255,255,.55);--t3:rgba(255,255,255,.3);
+  --green:#00d97e;--blue:#3b82f6;--orange:#f59e0b;--red:#ef4444;
+  --purple:#a855f7;--cyan:#06b6d4;--pink:#ec4899;
+  --glow-g:0 0 20px rgba(0,217,126,.15);--glow-b:0 0 20px rgba(59,130,246,.15);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.06) 0%,transparent 50%),
+             radial-gradient(ellipse at 70% 80%,rgba(0,217,126,.04) 0%,transparent 50%);
+  z-index:0;pointer-events:none}
+
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:16px}
+
+/* Header */
+.hdr{text-align:center;padding:30px 20px 20px}
+.hdr h1{font-size:1.8em;font-weight:700;letter-spacing:-.5px;
+  background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr .sub{color:var(--t2);font-size:.85em;margin-top:6px;font-weight:300}
+.status-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--red);position:relative}
+.pulse.on{background:var(--green)}
+.pulse.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:var(--green);opacity:.4;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.8);opacity:0}}
+.status-txt{font-size:.78em;color:var(--t2)}
+
+/* Section */
+.sec{margin-top:24px}
+.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 4px}
+.sec-hdr .badge{padding:3px 10px;border-radius:20px;font-size:.7em;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.badge-env{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-soil{background:rgba(0,217,126,.15);color:var(--green)}
+.badge-npk{background:rgba(245,158,11,.15);color:var(--orange)}
+.sec-hdr .sec-title{font-size:.85em;color:var(--t2);font-weight:500}
+
+/* Cards */
+.grid{display:grid;gap:12px}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.grid-3{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 16px;
+  position:relative;overflow:hidden;transition:all .3s ease}
+.card:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);transform:translateY(-2px)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px;opacity:.8}
+.card.c-blue::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.card.c-green::before{background:linear-gradient(90deg,var(--green),#34d399)}
+.card.c-orange::before{background:linear-gradient(90deg,var(--orange),var(--red))}
+.card.c-purple::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.card .lbl{font-size:.72em;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.8px}
+.card .val{font-size:1.9em;font-weight:700;margin:6px 0 2px;line-height:1;
+  background:linear-gradient(180deg,var(--t1) 40%,var(--t2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.card .unit{font-size:.7em;color:var(--t3);font-weight:400}
+.card .ico{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:2.2em;opacity:.08}
+
+/* Chart */
+.chart-wrap{margin-top:24px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tab{padding:6px 16px;border-radius:10px;font-size:.75em;font-weight:500;cursor:pointer;
+  background:var(--card);border:1px solid var(--card-b);color:var(--t2);transition:all .2s}
+.tab:hover{background:rgba(255,255,255,.08)}
+.tab.active{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:var(--blue)}
+.chart-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px}
+.chart-card canvas{width:100%!important;height:240px!important}
+
+/* Footer */
+.ftr{text-align:center;padding:24px;margin-top:20px;border-top:1px solid var(--card-b)}
+.ftr span{font-size:.7em;color:var(--t3);font-weight:400}
+.ftr .tag{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--card);
+  border:1px solid var(--card-b);margin:0 4px;font-family:monospace;font-size:.72em;color:var(--t2)}
+
+/* Responsive */
+@media(max-width:480px){
+  .hdr h1{font-size:1.4em}
+  .card .val{font-size:1.5em}
+  .grid{gap:8px}
+  .card{padding:16px 12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>智慧农业环境监测平台</h1>
+    <div class="sub">Smart Agriculture Monitoring System</div>
+    <div class="status-bar">
+      <div class="pulse" id="dot"></div>
+      <span class="status-txt" id="stxt">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-hdr"><span class="badge badge-env">ENV</span><span class="sec-title">环境参数</span></div>
+    <div class="grid grid-4">
+      <div class="card c-blue"><div class="lbl">光照强度</div><div class="val" id="lux">--</div><div class="unit">lx</div><div class="ico">&#9728;</div></div>
+      <div class="card c-orange"><div class="lbl">环境温度</div><div class="val" id="env_temp">--</div><div class="unit">&#8451;</div><div class="ico">&#127777;</div></div>
+      <div class="card c-blue"><div class="lbl">环境湿度</div><div class="val" id="env_humi">--</div><div class="unit">%</div><div class="ico">&#128167;</div></div>
+      <div class="card c-purple"><div class="lbl">大气压</div><div class="val" id="press">--</div><div class="unit">hPa</div><div class="ico">&#127744;</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-hdr"><span class="badge badge-soil">SOIL</span><span class="sec-title">土壤参数</span></div>
+    <div class="grid grid-3">
+      <div class="card c-orange"><div class="lbl">土壤温度</div><div class="val" id="soil_temp">--</div><div class="unit">&#8451;</div><div class="ico">&#127777;</div></div>
+      <div class="card c-green"><div class="lbl">土壤湿度</div><div class="val" id="soil_humi">--</div><div class="unit">%</div><div class="ico">&#128167;</div></div>
+      <div class="card c-purple"><div class="lbl">pH 值</div><div class="val" id="ph">--</div><div class="unit">pH</div><div class="ico">&#129514;</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-hdr"><span class="badge badge-npk">NPK</span><span class="sec-title">土壤养分</span></div>
+    <div class="grid grid-3">
+      <div class="card c-green"><div class="lbl">氮 Nitrogen</div><div class="val" id="n">--</div><div class="unit">mg/kg</div><div class="ico">N</div></div>
+      <div class="card c-blue"><div class="lbl">磷 Phosphorus</div><div class="val" id="p">--</div><div class="unit">mg/kg</div><div class="ico">P</div></div>
+      <div class="card c-orange"><div class="lbl">钾 Potassium</div><div class="val" id="k">--</div><div class="unit">mg/kg</div><div class="ico">K</div></div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="sec-hdr"><span class="badge badge-env">TREND</span><span class="sec-title">趋势图表</span></div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchChart(0)">温湿度</div>
+      <div class="tab" onclick="switchChart(1)">光照</div>
+      <div class="tab" onclick="switchChart(2)">土壤</div>
+      <div class="tab" onclick="switchChart(3)">pH</div>
+    </div>
+    <div class="chart-card"><canvas id="chart"></canvas></div>
+  </div>
+
+  <div class="ftr">
+    <span>SEQ <span class="tag" id="seq">-</span> OK <span class="tag" id="ok">0</span> FAIL <span class="tag" id="fail">0</span></span>
+    <br><br>
+    <span style="opacity:.4">Smart Agriculture IoT Platform &middot; ESP32 + LoRa + OneNet</span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+var curTab=0,chart=null,histData=[];
+var C={
+  blue:'#3b82f6',cyan:'#06b6d4',green:'#00d97e',orange:'#f59e0b',
+  red:'#ef4444',purple:'#a855f7',pink:'#ec4899'
+};
+
+function fmtTime(s){var m=Math.floor(s/60),ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
+
+function chartCfg(labels,datasets){
+  return{
+    type:'line',data:{labels:labels,datasets:datasets},
+    options:{
+      animation:{duration:400,easing:'easeOutQuart'},
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'bottom',labels:{color:'rgba(255,255,255,.5)',boxWidth:10,padding:16,font:{size:11,family:'Inter'}}}
+      },
+      scales:{
+        x:{ticks:{maxTicksLimit:8,color:'rgba(255,255,255,.25)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},border:{color:'transparent'}},
+        y:{ticks:{color:'rgba(255,255,255,.25)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},border:{color:'transparent'}}
+      },
+      elements:{point:{radius:0,hoverRadius:4},line:{borderWidth:2.5}}
+    }
+  };
+}
+
+function mkDS(label,data,color){
+  return{label:label,data:data,borderColor:color,
+    backgroundColor:function(ctx){
+      var g=ctx.chart.ctx.createLinearGradient(0,0,0,240);
+      g.addColorStop(0,color+'30');g.addColorStop(1,color+'00');return g;
+    },fill:true,tension:0.4};
+}
+
+function buildChart(){
+  var labels=histData.map(function(p){return fmtTime(p.t)});
+  var ds=[];
+  if(curTab===0){
+    ds=[mkDS('环境温度 (°C)',histData.map(function(p){return p.et}),C.orange),
+        mkDS('环境湿度 (%)',histData.map(function(p){return p.eh}),C.blue)];
+  }else if(curTab===1){
+    ds=[mkDS('光照 (lx)',histData.map(function(p){return p.lx}),C.cyan)];
+  }else if(curTab===2){
+    ds=[mkDS('土壤温度 (°C)',histData.map(function(p){return p.st}),C.orange),
+        mkDS('土壤湿度 (%)',histData.map(function(p){return p.sh}),C.green)];
+  }else{
+    ds=[mkDS('pH',histData.map(function(p){return p.ph}),C.purple)];
+  }
+  if(chart){chart.destroy();}
+  chart=new Chart(document.getElementById('chart'),chartCfg(labels,ds));
+}
+
+function switchChart(i){
+  curTab=i;
+  var tabs=document.querySelectorAll('.tab');
+  for(var j=0;j<tabs.length;j++) tabs[j].className='tab'+(j===i?' active':'');
+  buildChart();
+}
+
+function animateValue(el,val){el.textContent=val;}
+
+function update(){
+  fetch('/api/data').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('dot').className='pulse on';
+    document.getElementById('stxt').textContent='Live \u00b7 '+new Date().toLocaleTimeString();
+    animateValue(document.getElementById('lux'),d.lux.toFixed(1));
+    animateValue(document.getElementById('env_temp'),d.env_temp.toFixed(1));
+    animateValue(document.getElementById('env_humi'),d.env_humi.toFixed(1));
+    animateValue(document.getElementById('press'),d.press.toFixed(1));
+    animateValue(document.getElementById('soil_temp'),d.soil_temp.toFixed(1));
+    animateValue(document.getElementById('soil_humi'),d.soil_humi.toFixed(1));
+    animateValue(document.getElementById('ph'),d.ph.toFixed(2));
+    animateValue(document.getElementById('n'),d.n);
+    animateValue(document.getElementById('p'),d.p);
+    animateValue(document.getElementById('k'),d.k);
+    document.getElementById('seq').textContent=d.seq;
+    document.getElementById('ok').textContent=d.ok;
+    document.getElementById('fail').textContent=d.fail;
+  }).catch(function(){
+    document.getElementById('dot').className='pulse';
+    document.getElementById('stxt').textContent='Offline';
+  });
+}
+
+function fetchHistory(){
+  fetch('/api/history').then(function(r){return r.json()}).then(function(d){
+    histData=d;buildChart();
+  }).catch(function(){});
+}
+
+update();fetchHistory();
+setInterval(update,2000);
+setInterval(fetchHistory,4000);
+</script>
+</body>
+</html>
