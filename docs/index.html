@@ -152,7 +152,7 @@ body::before{content:'';position:fixed;inset:0;
 
   <div class="time-row">
     <span class="time-lbl" id="update_time">最后更新: --</span>
-    <span class="time-lbl">自动刷新: 30秒</span>
+    <span class="time-lbl"><span id="countdown_txt">30</span>秒后刷新</span>
   </div>
 
   <div class="ftr">
@@ -399,11 +399,8 @@ var countdown = 30;
 function updateCountdown(){
   countdown--;
   if(countdown <= 0) countdown = 30;
-  var el = document.getElementById('update_time');
-  if(el && !isDemo){
-    var now = el.textContent.replace(/ \(\d+s.*/, '');
-    el.textContent = now + ' (' + countdown + 's后刷新)';
-  }
+  var el = document.getElementById('countdown_txt');
+  if(el) el.textContent = countdown;
 }
 
 async function autoPoll(){
