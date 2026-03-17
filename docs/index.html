@@ -152,7 +152,7 @@ body::before{content:'';position:fixed;inset:0;
 
   <div class="time-row">
     <span class="time-lbl" id="update_time">最后更新: --</span>
-    <span class="time-lbl">自动刷新: 10秒</span>
+    <span class="time-lbl">自动刷新: 1分钟</span>
   </div>
 
   <div class="ftr">
@@ -162,88 +162,26 @@ body::before{content:'';position:fixed;inset:0;
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
 <script>
-var CFG = {
-  pid: 'W9BY3SlO8w',
-  dev: 'dachuang',
-  key: 'aDFIWDNUeFpLTTdUTzdCS1VzdWlyV3JLS3pnR2tkdVU=',
-  et: '2057492169',
-  ver: '2018-10-31'
-};
-var API_BASE = 'https://iot-api.heclouds.com';
-/* ====== Cloudflare Worker 代理 ======
- * 部署方法见 worker.js 文件，部署后把下面的 URL 改成你的 Worker 地址
- * 格式：https://你的worker名.你的账号.workers.dev
- */
-var WORKER_URL = 'https://muddy-dream-1b21.202313141300459.workers.dev';
-var token = '';
 var curTab = 0, chart = null, histCache = {};
 var isDemo = false;
 
-/* ====== Token: Web Crypto (HTTPS) + CryptoJS fallback (file://) ====== */
-function b64dec(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0)});}
-function b64enc(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
-
-async function genToken(){
-  var res = 'products/'+CFG.pid+'/devices/'+CFG.dev;
-  var sts = CFG.et+'\nsha256\n'+res+'\n'+CFG.ver;
-
-  /* 方式1: Web Crypto API (仅HTTPS) */
-  if(window.crypto && window.crypto.subtle){
-    try{
-      var keyBuf = b64dec(CFG.key);
-      var cryptoKey = await crypto.subtle.importKey('raw',keyBuf,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-      var sig = await crypto.subtle.sign('HMAC',cryptoKey,new TextEncoder().encode(sts));
-      var signB64 = b64enc(sig);
-      console.log('Token: Web Crypto API');
-      return 'version='+CFG.ver+'&res='+encodeURIComponent(res)+'&et='+CFG.et+'&method=sha256&sign='+encodeURIComponent(signB64);
-    }catch(e){console.warn('Web Crypto failed:',e);}
-  }
-
-  /* 方式2: CryptoJS (兼容file://本地) */
-  if(window.CryptoJS){
-    var keyWords = CryptoJS.enc.Base64.parse(CFG.key);
-    var hash = CryptoJS.HmacSHA256(sts, keyWords);
-    var signB64 = CryptoJS.enc.Base64.stringify(hash);
-    console.log('Token: CryptoJS fallback');
-    return 'version='+CFG.ver+'&res='+encodeURIComponent(res)+'&et='+CFG.et+'&method=sha256&sign='+encodeURIComponent(signB64);
-  }
-
-  throw new Error('无加密库可用');
-}
-
-/* ====== API ====== */
-function buildUrl(path,params){
-  var url = API_BASE+path+'?product_id='+CFG.pid+'&device_name='+CFG.dev;
-  if(params) url += '&'+params;
-  return WORKER_URL+'?url='+encodeURIComponent(url);
-}
-
-async function apiFetch(path,params){
+/* ====== 从 GitHub Actions 生成的静态文件读取数据（无需代理） ====== */
+async function fetchJSON(url){
   try{
-    var url = buildUrl(path,params);
-    var ctrl = new AbortController();
-    var tid = setTimeout(function(){ctrl.abort();},8000);
-    var resp = await fetch(url,{headers:{'authorization':token},signal:ctrl.signal});
-    clearTimeout(tid);
-    if(resp.ok){
-      var json = await resp.json();
-      if(json && json.code===0) return json;
-      console.warn('API error:', json);
-    }
-  }catch(e){console.warn('Fetch error:',e);}
+    var resp = await fetch(url+'?t='+Date.now(),{cache:'no-store'});
+    if(resp.ok) return await resp.json();
+  }catch(e){}
   return null;
 }
 
-/* ====== 演示模式：API连不上时显示模拟数据 ====== */
+/* ====== 演示模式 ====== */
 function genDemoData(){
   isDemo = true;
   document.getElementById('demoTag').style.display='inline';
   var d = {};
   var vals = {lux:12580,env_temp:26.4,env_humi:68,press:1013,soil_temp:22.1,soil_humi:45,ph:6.82,n:35,p:18,k:42};
   for(var k in vals){
-    /* 每次轻微随机波动 */
     var base = vals[k];
     var r = base * (0.95 + Math.random()*0.1);
     d[k] = {value: k==='n'||k==='p'||k==='k' ? Math.round(r) : parseFloat(r.toFixed(2))};
@@ -280,7 +218,7 @@ function updateUI(data){
       if(d[i].identifier) map[d[i].identifier] = {value: d[i].value};
     }
   } else {
-    map = d; /* 演示模式直接是对象格式 */
+    map = d;
   }
   var props = ['lux','env_temp','env_humi','press','soil_temp','soil_humi','ph','n','p','k'];
   for(var i=0;i<props.length;i++){
@@ -295,7 +233,6 @@ function updateUI(data){
   }
   document.getElementById('dot').className='dot on';
   document.getElementById('stxt').textContent=isDemo?'演示模式':'在线';
-  document.getElementById('update_time').textContent='最后更新: '+new Date().toLocaleTimeString('zh-CN');
 }
 
 /* ====== Chart ====== */
@@ -357,19 +294,14 @@ async function loadHistory(){
     buildChart();
     return;
   }
-  var now = Date.now();
-  var start = now - 24*3600*1000; /* 24小时前 */
-  var timeParams = 'start_time='+start+'&end_time='+now+'&limit=200&sort=asc';
   var ids = ['env_temp','soil_temp','env_humi','soil_humi','lux','ph'];
   for(var i=0;i<ids.length;i++){
-    try{
-      var resp = await apiFetch('/thingmodel/query-device-property-history','identifier='+ids[i]+'&'+timeParams);
-      if(resp && resp.data && resp.data.list && resp.data.list.length>0){
-        histCache[ids[i]] = resp.data.list.map(function(p){
-          return {time: p.time, value: parseFloat(p.value)};
-        });
-      }
-    }catch(e){}
+    var resp = await fetchJSON('data/history_'+ids[i]+'.json');
+    if(resp && resp.data && resp.data.list && resp.data.list.length>0){
+      histCache[ids[i]] = resp.data.list.map(function(p){
+        return {time: p.time, value: parseFloat(p.value)};
+      });
+    }
   }
   buildChart();
 }
@@ -377,17 +309,23 @@ async function loadHistory(){
 /* ====== Main ====== */
 async function init(){
   try{
-    token = await genToken();
     document.getElementById('stxt').textContent='正在获取数据...';
 
-    var data = await apiFetch('/thingmodel/query-device-property');
-    if(data){
+    /* 读取 GitHub Actions 生成的静态数据文件 */
+    var data = await fetchJSON('data/latest.json');
+    if(data && data.code===0){
       updateUI(data);
       document.getElementById('loader').classList.add('hide');
+
+      /* 读取更新时间 */
+      var ts = await fetchJSON('data/timestamp.json');
+      if(ts && ts.time){
+        document.getElementById('update_time').textContent='最后更新: '+new Date(ts.time).toLocaleString('zh-CN');
+      }
+
       await loadHistory();
     } else {
-      /* API连不上，启用演示模式 */
-      console.log('API不可用，启用演示模式');
+      console.log('静态数据不可用，启用演示模式');
       var demo = genDemoData();
       updateUI(demo);
       document.getElementById('loader').classList.add('hide');
@@ -395,7 +333,6 @@ async function init(){
     }
   }catch(e){
     console.error('初始化错误:',e);
-    /* 出错也启用演示模式 */
     var demo = genDemoData();
     updateUI(demo);
     document.getElementById('loader').classList.add('hide');
@@ -404,22 +341,20 @@ async function init(){
 }
 
 async function poll(){
-  if(isDemo){
-    updateUI(genDemoData());
-    return;
-  }
-  try{
-    var data = await apiFetch('/thingmodel/query-device-property');
-    if(data) updateUI(data);
-  }catch(e){
-    document.getElementById('dot').className='dot';
-    document.getElementById('stxt').textContent='离线';
+  if(isDemo) return;
+  var data = await fetchJSON('data/latest.json');
+  if(data && data.code===0){
+    updateUI(data);
+    var ts = await fetchJSON('data/timestamp.json');
+    if(ts && ts.time){
+      document.getElementById('update_time').textContent='最后更新: '+new Date(ts.time).toLocaleString('zh-CN');
+    }
   }
 }
 
 init();
-setInterval(poll,10000);
-setInterval(loadHistory,60000);
+setInterval(poll,60000); /* 每1分钟检查一次新数据 */
+setInterval(loadHistory,300000); /* 每5分钟刷新历史图表 */
 </script>
 </body>
 </html>

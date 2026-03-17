@@ -18,12 +18,21 @@
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
 
+/* AI 语音播报相关 */
+#include "ai_config.h"
+#include "spark_chat.h"
+#include "baidu_tts.h"
+#include "max98357a.h"
+/* 显示屏 */
+#include "st7735_display.h"
+
 #define TAG "A39C_RX"
 
 /* ====== WiFi STA 配置（连接路由器） ====== */
 #define WIFI_STA_SSID      "ESP"
 #define WIFI_STA_PASS      "123456789"
 #define WIFI_MAX_RETRY     10
+#define WIFI_RECONNECT_INTERVAL_MS  5000  /* 断线重连间隔(毫秒) */
 
 /* ====== OneNet MQTT 配置 ====== */
 #define ONENET_PRODUCT_ID   "W9BY3SlO8w"
@@ -70,6 +79,10 @@ static uint32_t ok_count = 0;
 static uint32_t fail_count = 0;
 static uint32_t rx_bytes = 0;
 static uint32_t aux_low_count = 0;
+
+/* 前置声明：跨模块共享状态 */
+static bool mqtt_connected = false;
+static bool mqtt_pending_send = false;
 
 /* 最新一帧数据（供 HTTP 接口读取） */
 static sensor_packet_t latest_pkt = {0};
@@ -182,14 +195,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < WIFI_MAX_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "重新连接WiFi... 第%d次", s_retry_num);
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-            ESP_LOGE(TAG, "WiFi连接失败，已达最大重试次数");
-        }
+        mqtt_connected = false;  /* WiFi断了MQTT肯定也断了 */
+        s_retry_num++;
+        ESP_LOGW(TAG, "WiFi断开，第%d次重连...", s_retry_num);
+        vTaskDelay(pdMS_TO_TICKS(WIFI_RECONNECT_INTERVAL_MS));
+        esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "获得IP地址: " IPSTR, IP2STR(&event->ip_info.ip));
@@ -230,12 +240,12 @@ static void wifi_init_sta(void)
 
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
             WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE, pdFALSE, portMAX_DELAY);
+            pdFALSE, pdFALSE, pdMS_TO_TICKS(30000));
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "WiFi已连接: %s", WIFI_STA_SSID);
     } else {
-        ESP_LOGE(TAG, "WiFi连接失败");
+        ESP_LOGW(TAG, "WiFi连接超时，系统继续启动，后台持续重连");
     }
 }
 
@@ -336,7 +346,6 @@ static httpd_handle_t start_webserver(void)
 
 /* ====== OneNet MQTT ====== */
 static esp_mqtt_client_handle_t mqtt_client = NULL;
-static bool mqtt_connected = false;
 
 /* URL 编码: 仅处理 Base64 中的特殊字符 +/= */
 static void url_encode_b64(const char *src, char *dst, size_t dst_size)
@@ -416,6 +425,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t base,
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT 已连接 OneNet");
         mqtt_connected = true;
+        mqtt_pending_send = true;  /* 重连后立即补发 */
         /* 订阅回复 topic，查看平台是否接受数据 */
         esp_mqtt_client_subscribe(mqtt_client, ONENET_TOPIC_REPLY, 0);
         ESP_LOGI(TAG, "已订阅: %s", ONENET_TOPIC_REPLY);
@@ -497,6 +507,11 @@ static void mqtt_pub_task(void *arg)
 {
     vTaskDelay(pdMS_TO_TICKS(5000));  /* 启动后等5秒(确保MQTT已连接) */
     while (1) {
+        if (mqtt_pending_send && mqtt_connected) {
+            ESP_LOGI(TAG, "MQTT 重连补发数据");
+            mqtt_publish_data();
+            mqtt_pending_send = false;
+        }
         mqtt_publish_data();
         vTaskDelay(pdMS_TO_TICKS(10000));  /* 每10秒上报一次 */
     }
@@ -574,6 +589,8 @@ static void uart_init_a39c(void)
     ESP_LOGI(TAG, "UART init done: %d 8N1", A39C_BAUD);
 }
 
+static void check_alerts(const sensor_packet_t *pkt, char *alert_buf, size_t buf_size);
+
 /* ====== LoRa 接收任务 ====== */
 static void lora_rx_task(void *arg)
 {
@@ -645,6 +662,23 @@ static void lora_rx_task(void *arg)
                     latest_pkt = pkt;
                     has_data = true;
                     history_push(&pkt);
+                    /* 实时刷新显示屏 */
+                    {
+                        display_sensor_data_t dd = {
+                            .lux          = pkt.lux,
+                            .env_temp_c   = pkt.env_temp_c,
+                            .env_humi_pct = pkt.env_humi_pct,
+                            .press_kpa    = pkt.press_kpa,
+                            .soil_temp_c  = pkt.soil_temp_c,
+                            .soil_humi_pct = pkt.soil_humi_pct,
+                            .ph = pkt.ph,
+                            .n = pkt.n, .p = pkt.p, .k = pkt.k,
+                        };
+                        char alert[64] = "";
+                        check_alerts(&pkt, alert, sizeof(alert));
+                        lcd_update(&dd, true, PLANT_SPECIES_EN,
+                                   mqtt_connected, mqtt_connected, alert);
+                    }
                 } else {
                     fail_count++;
                     ESP_LOGW(TAG, "Frame invalid. OK=%lu FAIL=%lu 原始帧=",
@@ -655,6 +689,261 @@ static void lora_rx_task(void *arg)
                 idx = 0;
             }
         }
+    }
+}
+
+/* ====== AI 语音播报 ====== */
+static max98357a_handle_t *g_audio_handle = NULL;
+static spark_chat_client_t g_spark = {0};
+static baidu_tts_handle_t  g_tts = {0};
+
+/* ====== 异常告警阈值（通用基础值，AI会根据品种联网搜索后细化判断） ====== */
+#define ALERT_TEMP_HIGH      40.0f   /* 高温上限 ℃ */
+#define ALERT_TEMP_LOW        2.0f   /* 低温下限 ℃ */
+#define ALERT_HUMI_HIGH      95.0f   /* 环境湿度过高 % */
+#define ALERT_HUMI_LOW       20.0f   /* 环境湿度过低 % */
+#define ALERT_SOIL_HUMI_LOW  15.0f   /* 土壤过干 % */
+#define ALERT_SOIL_HUMI_HIGH 90.0f   /* 土壤过湿 % */
+#define ALERT_SOIL_TEMP_HIGH 40.0f   /* 土壤温度过高 ℃ */
+#define ALERT_PH_LOW          3.5f   /* pH过酸 */
+#define ALERT_PH_HIGH         9.0f   /* pH过碱 */
+#define ALERT_LUX_HIGH    120000.0f  /* 光照过强 lux */
+
+#define NORMAL_REPORT_INTERVAL_S  300   /* 正常时5分钟播报一次 */
+#define ALERT_REPORT_INTERVAL_S    60   /* 异常时1分钟播报一次 */
+
+/* 检测数据是否异常，返回告警描述(空字符串=正常) */
+static void check_alerts(const sensor_packet_t *pkt, char *alert_buf, size_t buf_size)
+{
+    alert_buf[0] = '\0';
+    int offset = 0;
+
+    if (pkt->env_temp_c > ALERT_TEMP_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "环境温度过高%.1f℃！", pkt->env_temp_c);
+    }
+    if (pkt->env_temp_c < ALERT_TEMP_LOW) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "环境温度过低%.1f℃！", pkt->env_temp_c);
+    }
+    if (pkt->env_humi_pct > ALERT_HUMI_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "环境湿度过高%.0f%%！", pkt->env_humi_pct);
+    }
+    if (pkt->env_humi_pct < ALERT_HUMI_LOW) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "环境湿度过低%.0f%%！", pkt->env_humi_pct);
+    }
+    if (pkt->soil_humi_pct < ALERT_SOIL_HUMI_LOW) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "土壤湿度仅%.0f%%需浇水！", pkt->soil_humi_pct);
+    }
+    if (pkt->soil_humi_pct > ALERT_SOIL_HUMI_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "土壤湿度%.0f%%过高！", pkt->soil_humi_pct);
+    }
+    if (pkt->soil_temp_c > ALERT_SOIL_TEMP_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "土壤温度过高%.1f℃！", pkt->soil_temp_c);
+    }
+    if (pkt->ph < ALERT_PH_LOW) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "土壤pH%.2f偏酸！", pkt->ph);
+    }
+    if (pkt->ph > ALERT_PH_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "土壤pH%.2f偏碱！", pkt->ph);
+    }
+    if (pkt->lux > ALERT_LUX_HIGH) {
+        offset += snprintf(alert_buf + offset, buf_size - offset,
+            "光照过强%.0flux！", pkt->lux);
+    }
+}
+
+static void ai_audio_init(void)
+{
+    /* 初始化 MAX98357A 音频输出 */
+    ESP_LOGI(TAG, "初始化音频输出 MAX98357A...");
+    max98357a_config_t audio_cfg = max98357a_get_default_config();
+    audio_cfg.i2s_port     = I2S_NUM_0;
+    audio_cfg.bclk_pin     = AUDIO_BCLK_PIN;
+    audio_cfg.lrclk_pin    = AUDIO_LRCLK_PIN;
+    audio_cfg.din_pin      = AUDIO_DIN_PIN;
+    audio_cfg.sd_mode_pin  = AUDIO_SD_MODE_PIN;
+    audio_cfg.sample_rate  = 16000;
+    audio_cfg.bits_per_sample = I2S_DATA_BIT_WIDTH_16BIT;
+    audio_cfg.gain         = MAX98357A_GAIN_15DB;
+    audio_cfg.channel      = MAX98357A_CHANNEL_LEFT;
+
+    esp_err_t ret = max98357a_init(&audio_cfg, &g_audio_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "MAX98357A 初始化失败: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    /* 初始化豆包大模型 */
+    ESP_LOGI(TAG, "初始化 AI 大模型...");
+    spark_chat_config_t spark_cfg = {
+        .api_key  = AI_API_KEY,
+        .url      = AI_URL,
+        .user_id  = NULL,
+        .model    = AI_MODEL,
+        .timeout_ms = 30000,
+        .stream   = true,
+        .enable_web_search = true,
+        .search_mode = "auto",
+    };
+    spark_chat_init(&g_spark, &spark_cfg);
+
+    /* 动态生成 system prompt：根据 PLANT_SPECIES 让 AI 联网搜索适生条件 */
+    char sys_prompt[512];
+    snprintf(sys_prompt, sizeof(sys_prompt),
+        "你是%s种植智慧农业助手。监测对象是%s。"
+        "请联网搜索%s的最佳种植条件，"
+        "根据搜索结果直接分析传感器数据。"
+        "如有异常给出针对%s的建议。"
+        "回答极简，不超过50字，不要客套。",
+        PLANT_SPECIES, PLANT_SPECIES, PLANT_SPECIES, PLANT_SPECIES);
+    spark_chat_add_message(&g_spark, "system", sys_prompt);
+
+    /* 初始化百度 TTS */
+    ESP_LOGI(TAG, "初始化百度 TTS...");
+    baidu_tts_config_t tts_cfg = {
+        .api_key    = BAIDU_API_KEY,
+        .secret_key = BAIDU_SECRET_KEY,
+        .voice      = BAIDU_TTS_VOICE_FEMALE,
+        .speed      = 5,
+        .pitch      = 5,
+        .volume     = 15,
+        .timeout_ms = 30000,
+    };
+    baidu_tts_init(&g_tts, &tts_cfg, g_audio_handle);
+
+    /* 放大器上电后一次性 enable，此后保持常开，避免频繁 SD_MODE 切换产生噪声 */
+    max98357a_enable(g_audio_handle);
+
+    ESP_LOGI(TAG, "AI 语音播报模块初始化完成");
+}
+
+/* 构建传感器数据摘要发送给 AI */
+static void build_sensor_prompt(char *buf, size_t size, bool is_alert, const char *alerts)
+{
+    if (has_data) {
+        int n = snprintf(buf, size,
+            "数据：光照%.0f lx，气温%.1f℃，湿度%.0f%%，"
+            "气压%.0f，土温%.1f℃，土湿%.0f%%，"
+            "pH%.1f，N%u P%u K%u mg/kg。",
+            latest_pkt.lux, latest_pkt.env_temp_c, latest_pkt.env_humi_pct,
+            latest_pkt.press_kpa, latest_pkt.soil_temp_c, latest_pkt.soil_humi_pct,
+            latest_pkt.ph, latest_pkt.n, latest_pkt.p, latest_pkt.k);
+        if (is_alert && alerts[0]) {
+            snprintf(buf + n, size - n,
+                "【告警】%s 请分析并建议。", alerts);
+        } else {
+            snprintf(buf + n, size - n,
+                "简评当前环境。");
+        }
+    } else {
+        snprintf(buf, size, "暂无传感器数据，提醒检查设备。");
+    }
+}
+
+/* AI 分析 + 语音播报任务 */
+static void ai_report_task(void *arg)
+{
+    /* 等待系统完全启动 */
+    vTaskDelay(pdMS_TO_TICKS(10000));
+
+    /* 上电自我介绍 */
+    ESP_LOGI(TAG, "===== 播放自我介绍 =====");
+    {
+        char intro[128];
+        snprintf(intro, sizeof(intro),
+            "%s智慧监测系统已启动，开始为您实时分析环境数据。",
+            PLANT_SPECIES);
+        baidu_tts_speak(&g_tts, intro);
+    }
+
+    /* 等待3秒再开始定时播报（缩短延迟，加速首次检测） */
+    vTaskDelay(pdMS_TO_TICKS(3000));
+
+    int normal_elapsed_s = ALERT_REPORT_INTERVAL_S;  /* 初始化为告警间隔，确保立即触发首次检测 */
+    const int check_interval_s = 10;  /* 每10秒检测一次告警 */
+
+    while (1) {
+
+        if (!has_data) {
+            /* 没有传感器数据则等待后重试 */
+            vTaskDelay(pdMS_TO_TICKS(check_interval_s * 1000));
+            normal_elapsed_s += check_interval_s;
+            continue;
+        }
+
+        /* 检测异常 */
+        char alert_buf[256];
+        check_alerts(&latest_pkt, alert_buf, sizeof(alert_buf));
+        bool is_alert = (alert_buf[0] != '\0');
+
+        /* 决定是否播报：异常立即播报(最低间隔60s)，正常每5分钟播报 */
+        bool should_report = false;
+        if (is_alert && normal_elapsed_s >= ALERT_REPORT_INTERVAL_S) {
+            should_report = true;
+            ESP_LOGW(TAG, "检测到异常: %s", alert_buf);
+        } else if (normal_elapsed_s >= NORMAL_REPORT_INTERVAL_S) {
+            should_report = true;
+        }
+
+        if (!should_report) {
+            vTaskDelay(pdMS_TO_TICKS(check_interval_s * 1000));
+            normal_elapsed_s += check_interval_s;
+            continue;
+        }
+
+        normal_elapsed_s = 0;  /* 重置计时 */
+
+        ESP_LOGI(TAG, "===== AI 语音播报开始 (异常=%d) =====", is_alert);
+        ESP_LOGI(TAG, "空闲堆内存: %lu bytes", (unsigned long)esp_get_free_heap_size());
+
+        /* 1) 构建传感器数据提示词 */
+        char prompt[512];
+        build_sensor_prompt(prompt, sizeof(prompt), is_alert, alert_buf);
+        ESP_LOGI(TAG, "AI 提示词: %s", prompt);
+
+        /* 2) 发送给大模型 */
+        spark_chat_add_message(&g_spark, "user", prompt);
+        spark_chat_trim_history(&g_spark);
+
+        bool ok = spark_chat_request(&g_spark);
+        /* 每次请求后释放HTTP连接，避免复用过期连接导致下次收不到数据 */
+        spark_chat_close_connection(&g_spark);
+
+        if (ok) {
+            const char *response = spark_chat_get_last_response(&g_spark);
+            ESP_LOGI(TAG, "AI 回复: %s", response);
+
+            /* 把 AI 回复加入对话历史 */
+            spark_chat_add_message(&g_spark, "assistant", response);
+
+            /* 3) TTS 语音播放 */
+            if (strlen(response) > 0) {
+                ESP_LOGI(TAG, "TTS 播放中...");
+                esp_err_t ret = baidu_tts_speak(&g_tts, response);
+                if (ret != ESP_OK) {
+                    ESP_LOGW(TAG, "TTS 播放失败: %s", esp_err_to_name(ret));
+                }
+            } else {
+                ESP_LOGW(TAG, "AI 回复为空，跳过TTS");
+            }
+        } else {
+            ESP_LOGW(TAG, "AI 请求失败");
+        }
+
+        int next = is_alert ? ALERT_REPORT_INTERVAL_S : NORMAL_REPORT_INTERVAL_S;
+        ESP_LOGI(TAG, "===== AI 播报结束，%d 秒后下次检查 =====", next);
+
+        /* 延时放在循环末尾，首次能立即检测 */
+        vTaskDelay(pdMS_TO_TICKS(check_interval_s * 1000));
+        normal_elapsed_s += check_interval_s;
     }
 }
 
@@ -686,7 +975,21 @@ void app_main(void)
              gpio_get_level(A39C_MD1_PIN),
              gpio_get_level(A39C_AUX_PIN));
 
+    /* 初始化 ST7735S 显示屏（须在 LoRa 任务之前，否则 lcd_update 使用未初始化的 SPI） */
+    if (lcd_init() == ESP_OK) {
+        lcd_update(NULL, false, PLANT_SPECIES_EN, false, false, "");
+    }
+
     /* 在独立任务中运行 LoRa 接收循环 */
     ESP_LOGI(TAG, "空闲堆内存: %lu bytes", (unsigned long)esp_get_free_heap_size());
     xTaskCreate(lora_rx_task, "lora_rx", 8192, NULL, 10, NULL);
+
+    /* 初始化 AI 语音播报并启动任务 */
+    ai_audio_init();
+    xTaskCreate(ai_report_task, "ai_report", 16384, NULL, 3, NULL);
+
+    ESP_LOGI(TAG, "============================================");
+    ESP_LOGI(TAG, "  智慧农业监测系统已启动");
+    ESP_LOGI(TAG, "  LoRa + OneNet + AI语音播报");
+    ESP_LOGI(TAG, "============================================");
 }

@@ -1,0 +1,56 @@
+name: Fetch OneNet Data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # 每5分钟运行一次
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch OneNet data
+        run: |
+          mkdir -p docs/data
+
+          # 生成 Token
+          TOKEN=$(python3 -c "
+          import hmac, hashlib, base64, urllib.parse
+          key = base64.b64decode('aDFIWDNUeFpLTTdUTzdCS1VzdWlyV3JLS3pnR2tkdVU=')
+          res = 'products/W9BY3SlO8w/devices/dachuang'
+          et = '2057492169'
+          ver = '2018-10-31'
+          sign_str = et + '\n' + 'sha256' + '\n' + res + '\n' + ver
+          sig = hmac.new(key, sign_str.encode(), hashlib.sha256).digest()
+          sign_b64 = base64.b64encode(sig).decode()
+          print('version=' + ver + '&res=' + urllib.parse.quote(res) + '&et=' + et + '&method=sha256&sign=' + urllib.parse.quote(sign_b64))
+          ")
+
+          # 获取当前数据
+          curl -sf -H "authorization: $TOKEN" \
+            "https://iot-api.heclouds.com/thingmodel/query-device-property?product_id=W9BY3SlO8w&device_name=dachuang" \
+            -o docs/data/latest.json
+
+          # 获取历史数据(24小时)
+          START=$(python3 -c "import time; print(int((time.time()-86400)*1000))")
+          END=$(python3 -c "import time; print(int(time.time()*1000))")
+          for id in env_temp soil_temp env_humi soil_humi lux ph; do
+            curl -sf -H "authorization: $TOKEN" \
+              "https://iot-api.heclouds.com/thingmodel/query-device-property-history?product_id=W9BY3SlO8w&device_name=dachuang&identifier=$id&start_time=$START&end_time=$END&limit=200&sort=asc" \
+              -o "docs/data/history_${id}.json"
+          done
+
+          # 记录更新时间
+          echo "{\"time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > docs/data/timestamp.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/
+          git diff --cached --quiet || git commit -m "update sensor data"
+          git push
