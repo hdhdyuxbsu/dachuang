@@ -5,27 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>智慧农业监测平台</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#ffffff;
-  --panel:#ffffff;
-  --line:#e7ecef;
-  --line-strong:#d4dde2;
-  --text:#17313b;
-  --muted:#6f8792;
+  --bg:#fff;
+  --panel:#fff;
+  --line:#e7edf0;
+  --line-strong:#d3dde2;
+  --text:#17323d;
+  --muted:#6d8792;
   --green:#2f9e44;
   --blue:#1c7ed6;
   --orange:#f08c00;
-  --red:#e03131;
   --cyan:#0b7285;
-  --shadow:0 8px 24px rgba(17,24,39,.05);
+  --danger:#e03131;
+  --shadow:0 8px 24px rgba(15,23,42,.05);
 }
 body{
   font-family:'Noto Sans SC','Microsoft YaHei',system-ui,sans-serif;
   background:var(--bg);
   color:var(--text);
-  min-height:100vh;
 }
 .page{
   max-width:1200px;
@@ -34,27 +33,26 @@ body{
 }
 .hero{
   text-align:center;
-  padding:18px 0 8px;
+  padding:8px 0 12px;
 }
 .hero h1{
   font-size:40px;
   font-weight:800;
-  letter-spacing:1px;
-  color:#215c34;
+  color:#205c33;
 }
 .hero p{
   margin-top:10px;
-  color:var(--muted);
   font-size:14px;
+  color:var(--muted);
 }
 .status{
   margin:18px auto 0;
   display:inline-flex;
   align-items:center;
   gap:10px;
+  padding:10px 16px;
   border:1px solid var(--line);
   border-radius:999px;
-  padding:10px 16px;
   background:#fff;
   box-shadow:var(--shadow);
 }
@@ -62,27 +60,52 @@ body{
   width:10px;
   height:10px;
   border-radius:50%;
-  background:#c92a2a;
+  background:var(--danger);
 }
 .dot.on{background:var(--green)}
 .pill{
   padding:4px 10px;
   border-radius:999px;
   background:#f4f7f8;
-  color:#42606b;
+  color:#47616c;
   font-size:12px;
   font-weight:700;
 }
-.grid{
-  display:grid;
-  gap:14px;
+.api-box{
+  margin:18px auto 0;
+  max-width:760px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
 }
-.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
-.section{
-  margin-top:26px;
+.api-input{
+  width:min(440px,90vw);
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:14px;
+  color:var(--text);
+  background:#fff;
 }
+.api-btn{
+  border:1px solid var(--green);
+  border-radius:12px;
+  background:var(--green);
+  color:#fff;
+  padding:10px 16px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.api-tip{
+  width:100%;
+  font-size:13px;
+  color:var(--muted);
+  text-align:center;
+}
+.section{margin-top:26px}
 .section-head{
   display:flex;
   align-items:center;
@@ -92,59 +115,58 @@ body{
 .badge{
   padding:6px 12px;
   border-radius:999px;
+  background:#f3f6f8;
+  color:#3a5360;
   font-size:12px;
   font-weight:700;
-  background:#f3f6f8;
-  color:#37505a;
 }
 .section-title{
   font-size:24px;
   font-weight:800;
 }
 .section-sub{
-  color:var(--muted);
   font-size:14px;
+  color:var(--muted);
 }
+.grid{display:grid;gap:14px}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .card{
-  background:var(--panel);
+  background:#fff;
   border:1px solid var(--line);
   border-radius:18px;
   padding:18px;
   box-shadow:var(--shadow);
 }
-.metric .name{
-  font-size:14px;
-  color:var(--muted);
-}
+.metric .name{font-size:14px;color:var(--muted)}
 .metric .value{
   margin-top:14px;
   font-size:48px;
-  font-weight:800;
   line-height:1;
+  font-weight:800;
 }
 .metric .unit{
   margin-top:8px;
-  color:var(--muted);
   font-size:14px;
+  color:var(--muted);
 }
 .v-green{color:var(--green)}
 .v-blue{color:var(--blue)}
 .v-orange{color:var(--orange)}
 .v-cyan{color:var(--cyan)}
 .panel-title{
+  margin-bottom:10px;
   font-size:16px;
   font-weight:700;
-  margin-bottom:10px;
 }
 .panel-body{
-  color:#334b55;
-  line-height:1.7;
   min-height:88px;
+  line-height:1.7;
+  color:#334d57;
   white-space:pre-wrap;
 }
-.panel-body.empty{
-  color:#8aa0aa;
-}
+.panel-body.empty{color:#8aa0aa}
 .mini-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
@@ -157,8 +179,8 @@ body{
   background:#fcfdfe;
 }
 .mini .k{
-  color:var(--muted);
   font-size:12px;
+  color:var(--muted);
 }
 .mini .v{
   margin-top:8px;
@@ -173,27 +195,25 @@ body{
 }
 .tab{
   border:1px solid var(--line-strong);
+  border-radius:12px;
   background:#fff;
   color:#48616c;
-  border-radius:12px;
   padding:8px 16px;
   cursor:pointer;
   font-size:14px;
   font-weight:700;
 }
 .tab.active{
+  background:var(--green);
   border-color:var(--green);
   color:#fff;
-  background:var(--green);
 }
-.chart-wrap{
-  height:320px;
-}
+.chart-wrap{height:320px}
 .foot{
   margin-top:24px;
+  text-align:center;
   color:var(--muted);
   font-size:13px;
-  text-align:center;
   line-height:1.8;
 }
 .loading{
@@ -220,9 +240,7 @@ body{
   border-top-color:var(--green);
   animation:spin 1s linear infinite;
 }
-@keyframes spin{
-  to{transform:rotate(360deg)}
-}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media (max-width:980px){
   .grid-4,.grid-3,.grid-2,.mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -236,18 +254,23 @@ body{
 <body>
 <div class="loading" id="loader">
   <div class="spinner"></div>
-  <div>正在连接 OneNet 并加载最新数据...</div>
+  <div>正在加载 OneNet 和 ESP32 数据...</div>
 </div>
 
 <div class="page">
   <header class="hero">
     <h1>智慧农业监测平台</h1>
-    <p>OneNet 直连监测 · 白底控制台 · 实时状态展示</p>
+    <p>传感器数据与趋势图来自 OneNet，异常与 AI 回复直接来自 ESP32</p>
     <div class="status">
       <span class="dot" id="dot"></span>
       <span id="status_text">正在连接...</span>
       <span class="pill">OneNet</span>
-      <span class="pill" id="source_text">直连</span>
+      <span class="pill" id="source_text">需填ESP32地址</span>
+    </div>
+    <div class="api-box">
+      <input class="api-input" id="esp32_base" placeholder="ESP32 地址，例如 http://10.62.25.1">
+      <button class="api-btn" onclick="saveEsp32Base()">连接 ESP32</button>
+      <div class="api-tip">如果网页部署在 GitHub Pages，请填写开发板的局域网地址。也可在链接后追加 `?esp32=http://10.62.25.1`。</div>
     </div>
   </header>
 
@@ -256,7 +279,7 @@ body{
       <span class="badge">环境</span>
       <div>
         <div class="section-title">环境参数</div>
-        <div class="section-sub">展示来自 OneNet 最新物模型属性</div>
+        <div class="section-sub">来自 OneNet 最新物模型属性</div>
       </div>
     </div>
     <div class="grid grid-4">
@@ -272,7 +295,7 @@ body{
       <span class="badge">土壤</span>
       <div>
         <div class="section-title">土壤参数</div>
-        <div class="section-sub">温度、湿度与酸碱度</div>
+        <div class="section-sub">温度、湿度和酸碱度</div>
       </div>
     </div>
     <div class="grid grid-3">
@@ -302,17 +325,17 @@ body{
       <span class="badge">诊断</span>
       <div>
         <div class="section-title">异常与 AI 信息</div>
-        <div class="section-sub">异常与大模型回复直接读取 ESP32，本页其余监测数据继续使用 OneNet 直连</div>
+        <div class="section-sub">直接读取 ESP32 `/api/data` 返回的 `alert` 和 `ai_reply` 字段</div>
       </div>
     </div>
     <div class="grid grid-2">
       <div class="card">
         <div class="panel-title">检测到的异常</div>
-        <div class="panel-body empty" id="alert_text">正在分析实时环境...</div>
+        <div class="panel-body empty" id="alert_text">等待 ESP32 返回异常信息...</div>
       </div>
       <div class="card">
         <div class="panel-title">大模型回复</div>
-        <div class="panel-body empty" id="ai_reply_text">正在从 ESP32 读取大模型回复...</div>
+        <div class="panel-body empty" id="ai_reply_text">等待 ESP32 返回大模型回复...</div>
       </div>
     </div>
   </section>
@@ -322,7 +345,7 @@ body{
       <span class="badge">状态</span>
       <div>
         <div class="section-title">平台状态</div>
-        <div class="section-sub">显示当前模式、执行策略和刷新时间</div>
+        <div class="section-sub">控制模式、最近策略与更新时间来自 ESP32</div>
       </div>
     </div>
     <div class="card">
@@ -339,15 +362,15 @@ body{
       <span class="badge">趋势</span>
       <div>
         <div class="section-title">24 小时变化趋势</div>
-        <div class="section-sub">OneNet 属性历史曲线</div>
+        <div class="section-sub">来自 OneNet 属性历史接口</div>
       </div>
     </div>
     <div class="card">
       <div class="tabs">
-        <button class="tab active" data-tab="0" onclick="switchTab(0)">温度</button>
-        <button class="tab" data-tab="1" onclick="switchTab(1)">湿度</button>
-        <button class="tab" data-tab="2" onclick="switchTab(2)">光照</button>
-        <button class="tab" data-tab="3" onclick="switchTab(3)">酸碱度</button>
+        <button class="tab active" onclick="switchTab(0)">温度</button>
+        <button class="tab" onclick="switchTab(1)">湿度</button>
+        <button class="tab" onclick="switchTab(2)">光照</button>
+        <button class="tab" onclick="switchTab(3)">酸碱度</button>
       </div>
       <div class="chart-wrap">
         <canvas id="chart"></canvas>
@@ -356,7 +379,7 @@ body{
   </section>
 
   <div class="foot">
-    <div>数据来源：中国移动 OneNet 物联网平台</div>
+    <div>数据来源：中国移动 OneNet 物联网平台 + ESP32 本地接口</div>
     <div id="last_refresh">最近刷新：--</div>
   </div>
 </div>
@@ -373,6 +396,7 @@ let cachedToken = null;
 let chart = null;
 let currentTab = 0;
 let historyCache = {};
+let esp32Base = '';
 
 const tabConfigs = [
   { ids: ['env_temp', 'soil_temp'], labels: ['环境温度', '土壤温度'], colors: ['#f08c00', '#e03131'] },
@@ -391,7 +415,28 @@ function setPanelText(id, text, fallback){
   if (!el) return;
   const content = text && String(text).trim() ? String(text).trim() : fallback;
   el.textContent = content;
-  el.className = 'panel-body' + ((content === fallback) ? ' empty' : '');
+  el.className = 'panel-body' + (content === fallback ? ' empty' : '');
+}
+
+function normalizeBase(url){
+  return String(url || '').trim().replace(/\/+$/, '');
+}
+
+function loadEsp32Base(){
+  const queryBase = new URLSearchParams(window.location.search).get('esp32');
+  const localBase = localStorage.getItem('esp32_base');
+  esp32Base = normalizeBase(queryBase || localBase || '');
+  const input = document.getElementById('esp32_base');
+  if (input) input.value = esp32Base;
+  setText('source_text', esp32Base ? 'ESP32已配置' : '需填ESP32地址');
+}
+
+function saveEsp32Base(){
+  const input = document.getElementById('esp32_base');
+  esp32Base = normalizeBase(input ? input.value : '');
+  localStorage.setItem('esp32_base', esp32Base);
+  setText('source_text', esp32Base ? 'ESP32已配置' : '需填ESP32地址');
+  refreshAll();
 }
 
 function toFixedSafe(value, digits){
@@ -448,7 +493,8 @@ async function fetchLatest(){
 }
 
 async function fetchEsp32Status(){
-  const resp = await fetch('/api/data', { cache: 'no-store' });
+  if (!esp32Base) throw new Error('ESP32 base not configured');
+  const resp = await fetch(esp32Base + '/api/data', { cache: 'no-store' });
   if (!resp.ok) {
     throw new Error('ESP32 API HTTP ' + resp.status);
   }
@@ -491,7 +537,6 @@ function buildAlertText(values){
 
 function updateDashboard(resp, esp32Data){
   const values = parseMapFromLatestResponse(resp);
-
   setText('lux', toFixedSafe(values.lux, 1));
   setText('env_temp', toFixedSafe(values.env_temp, 1));
   setText('env_humi', toFixedSafe(values.env_humi, 1));
@@ -517,7 +562,7 @@ function updateDashboard(resp, esp32Data){
   setText('reason_text', String(reason));
 
   document.getElementById('dot').className = 'dot on';
-  setText('status_text', 'OneNet 在线');
+  setText('status_text', esp32Data ? 'OneNet 在线 / ESP32 已连接' : 'OneNet 在线 / ESP32 未连接');
   setText('updated_text', updatedText);
   setText('last_refresh', '最近刷新：' + new Date().toLocaleString('zh-CN'));
 }
@@ -590,10 +635,7 @@ async function loadHistory(){
     const resp = await fetchHistory(id);
     const list = resp && resp.data && Array.isArray(resp.data.list) ? resp.data.list : [];
     historyCache[id] = list.map(function(item){
-      return {
-        time: Number(item.time),
-        value: Number(item.value)
-      };
+      return { time: Number(item.time), value: Number(item.value) };
     });
   }
   renderChart();
@@ -611,12 +653,16 @@ async function refreshAll(){
   try {
     const latest = await fetchLatest();
     if (!latest || latest.code !== 0) throw new Error('OneNet 返回异常');
+
     let esp32Data = null;
     try {
       esp32Data = await fetchEsp32Status();
+      setText('source_text', 'ESP32已连接');
     } catch (espErr) {
       console.warn('ESP32 API error:', espErr);
+      setText('source_text', esp32Base ? 'ESP32连接失败' : '需填ESP32地址');
     }
+
     updateDashboard(latest, esp32Data);
     document.getElementById('loader').classList.add('hide');
   } catch (err) {
@@ -629,6 +675,7 @@ async function refreshAll(){
 }
 
 async function init(){
+  loadEsp32Base();
   await refreshAll();
   try {
     await loadHistory();

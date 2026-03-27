@@ -62,6 +62,7 @@
  */
 #define A39C_MD0_LEVEL     1
 #define A39C_MD1_LEVEL     0
+#define A39C_DIAG_READ_CONFIG_ON_BOOT 1
 
 /* ====== 帧格式 ====== */
 #define FRAME_HEAD1        0xAA
@@ -100,6 +101,7 @@ static uint32_t ok_count = 0;
 static uint32_t fail_count = 0;
 static uint32_t rx_bytes = 0;
 static uint32_t aux_low_count = 0;
+static uint32_t rx_pin_low_count = 0;
 
 /* 前置声明：跨模块共享状态 */
 static bool mqtt_connected = false;
@@ -115,8 +117,22 @@ static control_state_t g_control_state = {
     .reason = "init",
 };
 static volatile bool g_smart_control_force_run = false;
+static char g_last_alert[256] = "";
+static char g_last_ai_reply[256] = "";
 
 /* 控制命令协议: A5 5A MODE FAN PUMP SERVO_L SERVO_H RSV XOR */
+/*
+ * STM32 control frame protocol
+ * Byte0  : 0xA5
+ * Byte1  : 0x5A
+ * Byte2  : mode   (0x01 manual, 0x02 smart)
+ * Byte3  : fan    (0-100)
+ * Byte4  : pump   (0-100)
+ * Byte5  : servo low byte
+ * Byte6  : servo high byte   (0-180)
+ * Byte7  : reserved
+ * Byte8  : XOR checksum of Byte0..Byte7
+ */
 #define CONTROL_FRAME_HEAD1 0xA5
 #define CONTROL_FRAME_HEAD2 0x5A
 #define CONTROL_FRAME_LEN   9
@@ -170,6 +186,7 @@ static void send_control_frame_to_stm32(control_mode_t mode, uint8_t fan, uint8_
     }
 
     int written = uart_write_bytes(A39C_UART_NUM, frame, CONTROL_FRAME_LEN);
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, frame, CONTROL_FRAME_LEN, ESP_LOG_INFO);
     ESP_LOGI(TAG, "下发控制帧 mode=%s fan=%u pump=%u servo=%u bytes=%d",
              mode == CONTROL_MODE_SMART ? "smart" : "manual",
              fan, pump, servo, written);
@@ -367,40 +384,62 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static void set_cors_headers(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+}
+
 static esp_err_t api_data_handler(httpd_req_t *req)
 {
-    char buf[420];
-    char reason_esc[192];
+    char buf[1280];
+    char reason_esc[256];
+    char alert_esc[320];
+    char ai_reply_esc[320];
     json_escape_text(g_control_state.reason, reason_esc, sizeof(reason_esc));
+    json_escape_text(g_last_alert, alert_esc, sizeof(alert_esc));
+    json_escape_text(g_last_ai_reply, ai_reply_esc, sizeof(ai_reply_esc));
     if (has_data) {
         snprintf(buf, sizeof(buf),
             "{\"seq\":%u,\"lux\":%.2f,\"env_temp\":%.1f,\"env_humi\":%.1f,"
             "\"press\":%.1f,\"soil_temp\":%.1f,\"soil_humi\":%.1f,"
             "\"ph\":%.2f,\"n\":%u,\"p\":%u,\"k\":%u,"
             "\"ok\":%lu,\"fail\":%lu,"
-            "\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,\"reason\":\"%s\"}",
+            "\"plant\":\"%s\",\"updated\":%lu,"
+            "\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,"
+            "\"reason\":\"%s\",\"alert\":\"%s\",\"ai_reply\":\"%s\"}",
             latest_pkt.seq, latest_pkt.lux, latest_pkt.env_temp_c, latest_pkt.env_humi_pct,
             latest_pkt.press_kpa, latest_pkt.soil_temp_c, latest_pkt.soil_humi_pct,
             latest_pkt.ph, latest_pkt.n, latest_pkt.p, latest_pkt.k,
             (unsigned long)ok_count, (unsigned long)fail_count,
+            PLANT_SPECIES_EN, (unsigned long)g_control_state.update_time_s,
             g_control_mode == CONTROL_MODE_SMART ? "smart" : "manual",
             g_control_state.fan_speed,
             g_control_state.pump_speed,
             g_control_state.servo_angle,
-            reason_esc);
+            reason_esc,
+            alert_esc,
+            ai_reply_esc);
     } else {
         snprintf(buf, sizeof(buf),
             "{\"seq\":0,\"lux\":0,\"env_temp\":0,\"env_humi\":0,"
             "\"press\":0,\"soil_temp\":0,\"soil_humi\":0,"
             "\"ph\":0,\"n\":0,\"p\":0,\"k\":0,"
             "\"ok\":0,\"fail\":0,"
-            "\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,\"reason\":\"%s\"}",
+            "\"plant\":\"%s\",\"updated\":%lu,"
+            "\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,"
+            "\"reason\":\"%s\",\"alert\":\"%s\",\"ai_reply\":\"%s\"}",
+            PLANT_SPECIES_EN, (unsigned long)g_control_state.update_time_s,
             g_control_mode == CONTROL_MODE_SMART ? "smart" : "manual",
             g_control_state.fan_speed,
             g_control_state.pump_speed,
             g_control_state.servo_angle,
-            reason_esc);
+            reason_esc,
+            alert_esc,
+            ai_reply_esc);
     }
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, buf, strlen(buf));
     return ESP_OK;
@@ -408,18 +447,26 @@ static esp_err_t api_data_handler(httpd_req_t *req)
 
 static esp_err_t api_control_get_handler(httpd_req_t *req)
 {
-    char buf[320];
-    char reason_esc[192];
+    char buf[1024];
+    char reason_esc[256];
+    char alert_esc[320];
+    char ai_reply_esc[320];
     json_escape_text(g_control_state.reason, reason_esc, sizeof(reason_esc));
+    json_escape_text(g_last_alert, alert_esc, sizeof(alert_esc));
+    json_escape_text(g_last_ai_reply, ai_reply_esc, sizeof(ai_reply_esc));
     snprintf(buf, sizeof(buf),
-             "{\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,"
-             "\"updated\":%lu,\"reason\":\"%s\"}",
+             "{\"plant\":\"%s\",\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,"
+             "\"updated\":%lu,\"reason\":\"%s\",\"alert\":\"%s\",\"ai_reply\":\"%s\"}",
+             PLANT_SPECIES_EN,
              g_control_mode == CONTROL_MODE_SMART ? "smart" : "manual",
              g_control_state.fan_speed,
              g_control_state.pump_speed,
              g_control_state.servo_angle,
              (unsigned long)g_control_state.update_time_s,
-             reason_esc);
+             reason_esc,
+             alert_esc,
+             ai_reply_esc);
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, buf, strlen(buf));
     return ESP_OK;
@@ -482,16 +529,24 @@ static esp_err_t api_control_post_handler(httpd_req_t *req)
 
     cJSON_Delete(root);
 
-    char reason_esc[192];
+    char reason_esc[256];
+    char alert_esc[320];
+    char ai_reply_esc[320];
     json_escape_text(g_control_state.reason, reason_esc, sizeof(reason_esc));
-    char resp[320];
+    json_escape_text(g_last_alert, alert_esc, sizeof(alert_esc));
+    json_escape_text(g_last_ai_reply, ai_reply_esc, sizeof(ai_reply_esc));
+    char resp[1024];
     snprintf(resp, sizeof(resp),
-             "{\"ok\":true,\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,\"reason\":\"%s\"}",
+             "{\"ok\":true,\"mode\":\"%s\",\"fan\":%u,\"pump\":%u,\"servo\":%u,"
+             "\"reason\":\"%s\",\"alert\":\"%s\",\"ai_reply\":\"%s\"}",
              g_control_mode == CONTROL_MODE_SMART ? "smart" : "manual",
              g_control_state.fan_speed,
              g_control_state.pump_speed,
              g_control_state.servo_angle,
-             reason_esc);
+             reason_esc,
+             alert_esc,
+             ai_reply_esc);
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp, strlen(resp));
     return ESP_OK;
@@ -499,6 +554,7 @@ static esp_err_t api_control_post_handler(httpd_req_t *req)
 
 static esp_err_t api_history_handler(httpd_req_t *req)
 {
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     char line[128];
 
@@ -771,6 +827,123 @@ static void mqtt_init(void)
 }
 
 /* ====== 硬件初始化 ====== */
+static bool a39c_wait_aux_ready(uint32_t timeout_ms)
+{
+    TickType_t start_tick = xTaskGetTickCount();
+    while (gpio_get_level(A39C_AUX_PIN) == 0 &&
+           (xTaskGetTickCount() - start_tick) < pdMS_TO_TICKS(timeout_ms)) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    return gpio_get_level(A39C_AUX_PIN) == 1;
+}
+
+static void a39c_set_mode_levels(int md0, int md1)
+{
+    ESP_ERROR_CHECK(gpio_set_level(A39C_MD0_PIN, md0));
+    ESP_ERROR_CHECK(gpio_set_level(A39C_MD1_PIN, md1));
+    vTaskDelay(pdMS_TO_TICKS(10));
+}
+
+static int a39c_read_response(uint8_t *buf, size_t buf_size,
+                              uint32_t first_byte_timeout_ms,
+                              uint32_t idle_timeout_ms)
+{
+    int total = 0;
+    int n = uart_read_bytes(A39C_UART_NUM, buf, (uint32_t)buf_size,
+                            pdMS_TO_TICKS(first_byte_timeout_ms));
+    if (n <= 0) {
+        return 0;
+    }
+    total += n;
+
+    while ((size_t)total < buf_size) {
+        n = uart_read_bytes(A39C_UART_NUM, buf + total, (uint32_t)(buf_size - total),
+                            pdMS_TO_TICKS(idle_timeout_ms));
+        if (n <= 0) {
+            break;
+        }
+        total += n;
+    }
+    return total;
+}
+
+static uint32_t be32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) |
+           ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8) |
+           (uint32_t)p[3];
+}
+
+static void a39c_diag_dump_config(void)
+{
+#if A39C_DIAG_READ_CONFIG_ON_BOOT
+    const uint8_t read_all_cmd[] = {0x00, 0x04, 0x1B};
+    const uint8_t read_ver_cmd[] = {0x00, 0x00, 0x01};
+    uint8_t resp[96];
+
+    ESP_LOGI(TAG, "A39C diag: switch to config mode for register dump");
+    a39c_set_mode_levels(0, 0);
+    if (!a39c_wait_aux_ready(1000)) {
+        ESP_LOGW(TAG, "A39C diag: AUX did not go high in config mode");
+    }
+
+    ESP_ERROR_CHECK(uart_flush_input(A39C_UART_NUM));
+    uart_write_bytes(A39C_UART_NUM, read_all_cmd, sizeof(read_all_cmd));
+    uart_wait_tx_done(A39C_UART_NUM, pdMS_TO_TICKS(200));
+
+    int n = a39c_read_response(resp, sizeof(resp), 300, 80);
+    ESP_LOGI(TAG, "A39C diag read-all response bytes=%d", n);
+    if (n > 0) {
+        ESP_LOG_BUFFER_HEX_LEVEL(TAG, resp, n, ESP_LOG_INFO);
+    }
+    if (n >= 30 && resp[0] == 0x00 && resp[1] == 0x04 && resp[2] == 0x1B) {
+        uint32_t baud = be32(&resp[3]);
+        uint8_t uart_param = resp[7];
+        uint16_t reg06 = ((uint16_t)resp[8] << 8) | resp[9];
+        uint16_t work_mode = ((uint16_t)resp[10] << 8) | resp[11];
+        uint8_t local_group = resp[23];
+        uint8_t local_addr = resp[24];
+        uint8_t target_group = resp[25];
+        uint8_t target_addr = resp[26];
+        uint8_t channel = (uint8_t)((reg06 >> 5) & 0x7F);
+        uint8_t power = (uint8_t)((reg06 >> 3) & 0x03);
+        uint8_t air_rate = (uint8_t)(reg06 & 0x07);
+
+        ESP_LOGI(TAG, "A39C cfg: baud=%lu uart_param=0x%02X reg06=0x%04X mode=0x%04X",
+                 (unsigned long)baud, uart_param, reg06, work_mode);
+        ESP_LOGI(TAG, "A39C cfg: channel=%u power_idx=%u air_rate_idx=%u local=%02X:%02X target=%02X:%02X",
+                 channel, power, air_rate, local_group, local_addr, target_group, target_addr);
+    } else {
+        ESP_LOGW(TAG, "A39C diag: unexpected read-all response");
+    }
+
+    ESP_ERROR_CHECK(uart_flush_input(A39C_UART_NUM));
+    uart_write_bytes(A39C_UART_NUM, read_ver_cmd, sizeof(read_ver_cmd));
+    uart_wait_tx_done(A39C_UART_NUM, pdMS_TO_TICKS(200));
+    n = a39c_read_response(resp, sizeof(resp), 300, 80);
+    ESP_LOGI(TAG, "A39C diag version response bytes=%d", n);
+    if (n > 0) {
+        ESP_LOG_BUFFER_HEX_LEVEL(TAG, resp, n, ESP_LOG_INFO);
+        if (n > 3) {
+            char ver[64];
+            int copy_len = n - 3;
+            if (copy_len >= (int)sizeof(ver)) copy_len = (int)sizeof(ver) - 1;
+            memcpy(ver, &resp[3], (size_t)copy_len);
+            ver[copy_len] = '\0';
+            ESP_LOGI(TAG, "A39C version: %s", ver);
+        }
+    }
+
+    ESP_LOGI(TAG, "A39C diag: restore work mode");
+    a39c_set_mode_levels(A39C_MD0_LEVEL, A39C_MD1_LEVEL);
+    if (!a39c_wait_aux_ready(1000)) {
+        ESP_LOGW(TAG, "A39C diag: AUX did not go high after restoring work mode");
+    }
+    ESP_ERROR_CHECK(uart_flush_input(A39C_UART_NUM));
+#endif
+}
+
 static void a39c_mode_init(void)
 {
     ESP_ERROR_CHECK(gpio_reset_pin(A39C_MD0_PIN));
@@ -781,9 +954,7 @@ static void a39c_mode_init(void)
         .mode = GPIO_MODE_OUTPUT,
     };
     ESP_ERROR_CHECK(gpio_config(&out_cfg));
-    ESP_ERROR_CHECK(gpio_set_level(A39C_MD0_PIN, A39C_MD0_LEVEL));
-    ESP_ERROR_CHECK(gpio_set_level(A39C_MD1_PIN, A39C_MD1_LEVEL));
-    vTaskDelay(pdMS_TO_TICKS(10));
+    a39c_set_mode_levels(A39C_MD0_LEVEL, A39C_MD1_LEVEL);
 
     ESP_LOGI(TAG, "模式脚设置: 目标 MD0=%d MD1=%d, 读回 MD0=%d MD1=%d",
              A39C_MD0_LEVEL,
@@ -797,6 +968,11 @@ static void a39c_mode_init(void)
         .pull_up_en = GPIO_PULLUP_ENABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&in_cfg));
+
+    (void)a39c_wait_aux_ready(1000);
+
+    ESP_LOGI(TAG, "A39C ready check: AUX=%d after mode switch",
+             gpio_get_level(A39C_AUX_PIN));
 }
 
 static void uart_init_a39c(void)
@@ -814,7 +990,14 @@ static void uart_init_a39c(void)
     ESP_ERROR_CHECK(uart_param_config(A39C_UART_NUM, &cfg));
     ESP_ERROR_CHECK(uart_set_pin(A39C_UART_NUM, A39C_TX_PIN, A39C_RX_PIN,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    ESP_LOGI(TAG, "UART init done: %d 8N1", A39C_BAUD);
+    ESP_ERROR_CHECK(uart_flush_input(A39C_UART_NUM));
+    ESP_ERROR_CHECK(gpio_pullup_en(A39C_RX_PIN));
+    ESP_LOGI(TAG, "UART init done: %d 8N1, TX=GPIO%d RX=GPIO%d RX_LEVEL=%d AUX=%d",
+             A39C_BAUD,
+             A39C_TX_PIN,
+             A39C_RX_PIN,
+             gpio_get_level(A39C_RX_PIN),
+             gpio_get_level(A39C_AUX_PIN));
 }
 
 static void check_alerts(const sensor_packet_t *pkt, char *alert_buf, size_t buf_size);
@@ -828,10 +1011,14 @@ static void lora_rx_task(void *arg)
     TickType_t last_report_tick = xTaskGetTickCount();
     uint32_t last_rx_bytes = 0;
     uint32_t last_aux_low_count = 0;
+    uint32_t last_rx_pin_low_count = 0;
 
     while (1) {
         if (gpio_get_level(A39C_AUX_PIN) == 0) {
             aux_low_count++;
+        }
+        if (gpio_get_level(A39C_RX_PIN) == 0) {
+            rx_pin_low_count++;
         }
 
         uint8_t b;
@@ -841,6 +1028,7 @@ static void lora_rx_task(void *arg)
             if ((now_tick - last_report_tick) >= pdMS_TO_TICKS(5000)) {
                 uint32_t delta_rx = rx_bytes - last_rx_bytes;
                 uint32_t delta_aux_low = aux_low_count - last_aux_low_count;
+                uint32_t delta_rx_pin_low = rx_pin_low_count - last_rx_pin_low_count;
                 ESP_LOGI(TAG, "5秒统计: RX字节=%lu, OK=%lu, FAIL=%lu",
                          (unsigned long)rx_bytes,
                          (unsigned long)ok_count,
@@ -849,15 +1037,23 @@ static void lora_rx_task(void *arg)
                          (unsigned long)delta_rx,
                          (unsigned long)delta_aux_low,
                          gpio_get_level(A39C_AUX_PIN));
+                ESP_LOGI(TAG, "RX delta detail: rx_low=%lu rx_level=%d aux=%d",
+                         (unsigned long)delta_rx_pin_low,
+                         gpio_get_level(A39C_RX_PIN),
+                         gpio_get_level(A39C_AUX_PIN));
 
-                if (delta_rx == 0 && delta_aux_low == 0) {
+                if (delta_rx == 0 && delta_aux_low == 0 && delta_rx_pin_low == 0) {
                     ESP_LOGW(TAG, "未见AUX活动，接收模块可能没有收到空中数据，请检查信道/地址/空口速率");
                 } else if (delta_rx == 0 && delta_aux_low > 0) {
                     ESP_LOGW(TAG, "AUX有活动但UART无字节，请检查A39C TXD->ESP32-S3 GPIO%d 以及模块串口参数", A39C_RX_PIN);
                 }
+                if (delta_rx == 0 && delta_aux_low == 0 && delta_rx_pin_low > 0) {
+                    ESP_LOGW(TAG, "RX pin toggles but UART gets no bytes. Check baud/parity/voltage level/shared GND.");
+                }
                 last_report_tick = now_tick;
                 last_rx_bytes = rx_bytes;
                 last_aux_low_count = aux_low_count;
+                last_rx_pin_low_count = rx_pin_low_count;
             }
             continue;
         }
@@ -907,6 +1103,7 @@ static void lora_rx_task(void *arg)
                         };
                         char alert[64] = "";
                         check_alerts(&pkt, alert, sizeof(alert));
+                        snprintf(g_last_alert, sizeof(g_last_alert), "%s", alert);
                         lcd_update(&dd, true, PLANT_SPECIES_EN,
                                    mqtt_connected, mqtt_connected, alert);
                     }
@@ -1200,6 +1397,7 @@ static void ai_report_task(void *arg)
         /* 检测异常 */
         char alert_buf[256];
         check_alerts(&latest_pkt, alert_buf, sizeof(alert_buf));
+        snprintf(g_last_alert, sizeof(g_last_alert), "%s", alert_buf);
         bool is_alert = (alert_buf[0] != '\0');
 
         /* 决定是否播报：异常立即播报(最低间隔60s)，正常每5分钟播报 */
@@ -1238,6 +1436,7 @@ static void ai_report_task(void *arg)
         if (ok) {
             const char *response = spark_chat_get_last_response(&g_spark);
             ESP_LOGI(TAG, "AI 回复: %s", response);
+            snprintf(g_last_ai_reply, sizeof(g_last_ai_reply), "%s", response ? response : "");
 
             /* 把 AI 回复加入对话历史 */
             spark_chat_add_message(&g_spark, "assistant", response);
@@ -1254,6 +1453,7 @@ static void ai_report_task(void *arg)
             }
         } else {
             ESP_LOGW(TAG, "AI 请求失败");
+            snprintf(g_last_ai_reply, sizeof(g_last_ai_reply), "%s", "");
         }
 
         int next = is_alert ? ALERT_REPORT_INTERVAL_S : NORMAL_REPORT_INTERVAL_S;
@@ -1328,6 +1528,7 @@ void app_main(void)
     /* 先初始化 LoRa 接收硬件 */
     a39c_mode_init();
     uart_init_a39c();
+    a39c_diag_dump_config();
 
     /* 启动 WiFi STA（连接路由器） */
     wifi_init_sta();
