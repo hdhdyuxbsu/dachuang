@@ -871,6 +871,447 @@ async function init(){
   }
 }
 
+/* ===== 仅追加：监控对象输入与显示增强 ===== */
+(function plantTargetEnhancement(){
+  let currentPlantTarget = '';
+
+  function ensurePlantStyle(){
+    if (document.getElementById('plant_target_style')) return;
+    const style = document.createElement('style');
+    style.id = 'plant_target_style';
+    style.textContent = [
+      '.plant-box{margin:10px auto 0;max-width:760px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}',
+      '.plant-input{width:min(320px,82vw);border:1px solid #d3dde2;border-radius:12px;padding:10px 12px;font-size:14px;color:#17323d;background:#fff}',
+      '.plant-btn{border:1px solid #1c7ed6;border-radius:12px;background:#1c7ed6;color:#fff;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}',
+      '.plant-tip{width:100%;font-size:13px;color:#6d8792;text-align:center}',
+      '.plant-pill{background:#eef5ff;color:#1c5ca8}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  function ensurePlantUi(){
+    ensurePlantStyle();
+
+    const status = document.querySelector('.status');
+    if (status && !document.getElementById('plant_target_pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'pill plant-pill';
+      pill.id = 'plant_target_pill';
+      pill.textContent = '监控对象：--';
+      status.appendChild(pill);
+    }
+
+    const apiBox = document.querySelector('.api-box');
+    if (apiBox && !document.getElementById('plant_target_input')) {
+      const box = document.createElement('div');
+      box.className = 'plant-box';
+      box.innerHTML = '' +
+        '<input class="plant-input" id="plant_target_input" placeholder="输入检测对象，例如：番茄 / 黄瓜 / 生菜">' +
+        '<button class="plant-btn" id="plant_target_btn" type="button">确定监控对象</button>' +
+        '<div class="plant-tip" id="plant_target_tip">提交后将发送到 ESP32 的 /api/plant，并触发立即调节。</div>';
+      apiBox.insertAdjacentElement('afterend', box);
+
+      const btn = document.getElementById('plant_target_btn');
+      if (btn) {
+        btn.addEventListener('click', function(){
+          setPlantTarget();
+        });
+      }
+    }
+  }
+
+  function setPlantTargetUi(name){
+    const normalized = String(name || '').trim();
+    if (!normalized) return;
+    currentPlantTarget = normalized;
+
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) pill.textContent = '监控对象：' + normalized;
+
+    const input = document.getElementById('plant_target_input');
+    if (input && input.value !== normalized) input.value = normalized;
+  }
+
+  function resetSlidersAfterPlantSwitch(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，滑块已清零。');
+  }
+
+  async function setPlantTarget(){
+    ensurePlantUi();
+
+    if (!esp32Base) {
+      setText('plant_target_tip', '请先填写 ESP32 地址，再设置监控对象。');
+      return;
+    }
+
+    const input = document.getElementById('plant_target_input');
+    const plant = String(input ? input.value : '').trim();
+    if (!plant) {
+      setText('plant_target_tip', '请输入检测对象后再提交。');
+      return;
+    }
+
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plant: plant })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      const target = data && typeof data.plant === 'string' ? data.plant : plant;
+      setPlantTargetUi(target);
+      resetSlidersAfterPlantSwitch();
+      setText('plant_target_tip', '监控对象已更新：' + target + '，已触发立即调节。');
+      await refreshAll();
+    } catch (err) {
+      console.error('setPlantTarget error:', err);
+      setText('plant_target_tip', '监控对象设置失败，请检查 ESP32 地址与网络。');
+    }
+  }
+
+  const oldUpdateDashboard = updateDashboard;
+  updateDashboard = function(resp, esp32Data){
+    oldUpdateDashboard(resp, esp32Data);
+    ensurePlantUi();
+    if (esp32Data && typeof esp32Data.plant === 'string' && String(esp32Data.plant).trim()) {
+      setPlantTargetUi(esp32Data.plant);
+    } else if (!currentPlantTarget) {
+      const pill = document.getElementById('plant_target_pill');
+      if (pill) pill.textContent = '监控对象：--';
+    }
+  };
+
+  window.setPlantTarget = setPlantTarget;
+  ensurePlantUi();
+})();
+
+/* ===== 仅追加：监控对象功能加强版（不改动原有代码） ===== */
+(function plantTargetEnhancementV2(){
+  function addStyleV2(){
+    if (document.getElementById('plant_target_style_v2')) return;
+    const style = document.createElement('style');
+    style.id = 'plant_target_style_v2';
+    style.textContent = [
+      '.plant-v2{margin:16px auto 0;max-width:760px;border:1px solid #dfe8ed;border-radius:14px;padding:12px;background:#fff}',
+      '.plant-v2-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}',
+      '.plant-v2-title{font-size:13px;color:#6d8792;font-weight:700;min-width:86px}',
+      '.plant-v2-input{flex:1 1 280px;min-width:240px;border:1px solid #cfdbe1;border-radius:10px;padding:9px 12px;font-size:14px;color:#17323d}',
+      '.plant-v2-btn{border:1px solid #2f9e44;background:#2f9e44;color:#fff;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;cursor:pointer}',
+      '.plant-v2-btn:disabled{opacity:.6;cursor:not-allowed}',
+      '.plant-v2-now{margin-top:9px;font-size:13px;color:#43606b}',
+      '.plant-v2-now b{color:#205c33}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  function ensureUiV2(){
+    addStyleV2();
+    if (document.getElementById('plant_v2_box')) return;
+
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+
+    const box = document.createElement('div');
+    box.className = 'plant-v2';
+    box.id = 'plant_v2_box';
+    box.innerHTML = '' +
+      '<div class="plant-v2-row">' +
+      '  <span class="plant-v2-title">检测对象</span>' +
+      '  <input id="plant_v2_input" class="plant-v2-input" placeholder="例如：番茄 / 黄瓜 / 草莓 / 生菜">' +
+      '  <button id="plant_v2_btn" class="plant-v2-btn" type="button">确定并立即调节</button>' +
+      '</div>' +
+      '<div id="plant_v2_now" class="plant-v2-now">当前监控对象：<b>--</b></div>';
+
+    hero.appendChild(box);
+
+    const btn = document.getElementById('plant_v2_btn');
+    const input = document.getElementById('plant_v2_input');
+    if (btn) {
+      btn.addEventListener('click', function(){
+        submitPlantV2();
+      });
+    }
+    if (input) {
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') {
+          submitPlantV2();
+        }
+      });
+    }
+  }
+
+  function setCurrentPlantV2(name){
+    const normalized = String(name || '').trim();
+    if (!normalized) return;
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) now.innerHTML = '当前监控对象：<b>' + normalized + '</b>';
+
+    const input = document.getElementById('plant_v2_input');
+    if (input && input.value !== normalized) input.value = normalized;
+  }
+
+  function clearSlidersOnPlantSwitchV2(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，控制滑块已清零。');
+  }
+
+  async function forceSmartModeV2(){
+    if (!esp32Base) return;
+    try {
+      await fetch(esp32Base + '/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'smart', fan: 0, pump: 0, servo: 0 })
+      });
+      currentMode = 'smart';
+      refreshModeButtons();
+      setText('mode_note', '对象已切换，已自动进入智能模式并触发即时调节。');
+    } catch (e) {
+      console.warn('forceSmartModeV2 failed:', e);
+    }
+  }
+
+  async function submitPlantV2(){
+    ensureUiV2();
+
+    const btn = document.getElementById('plant_v2_btn');
+    const input = document.getElementById('plant_v2_input');
+    const raw = input ? input.value : '';
+    const plant = String(raw || '').trim();
+
+    if (!esp32Base) {
+      setText('mode_note', '请先连接 ESP32，再提交检测对象。');
+      return;
+    }
+    if (!plant) {
+      setText('mode_note', '请输入检测对象后再点击确定。');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plant: plant })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      const appliedPlant = data && typeof data.plant === 'string' ? data.plant : plant;
+
+      setCurrentPlantV2(appliedPlant);
+      clearSlidersOnPlantSwitchV2();
+      await forceSmartModeV2();
+      await refreshAll();
+    } catch (err) {
+      console.error('submitPlantV2 error:', err);
+      setText('mode_note', '检测对象提交失败，请检查 ESP32 地址或网络。');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  const oldUpdateDashboardV2 = updateDashboard;
+  updateDashboard = function(resp, esp32Data){
+    oldUpdateDashboardV2(resp, esp32Data);
+    ensureUiV2();
+    if (esp32Data && typeof esp32Data.plant === 'string' && String(esp32Data.plant).trim()) {
+      setCurrentPlantV2(esp32Data.plant);
+    }
+  };
+
+  window.submitPlantV2 = submitPlantV2;
+  ensureUiV2();
+})();
+
+/* ===== 仅追加：监控对象业务逻辑兜底（AI联动 + 切换清零） ===== */
+(function plantTargetBusinessBridgeV3(){
+  let lastSubmittedTarget = '';
+
+  function getTargetInputElement(){
+    return document.getElementById('plant_v2_input') || document.getElementById('plant_target_input');
+  }
+
+  function getCurrentTargetText(){
+    const now = document.getElementById('plant_v2_now');
+    if (now) {
+      const txt = now.textContent || '';
+      const v = txt.replace('当前监控对象：', '').trim();
+      if (v && v !== '--') return v;
+    }
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) {
+      const txt = pill.textContent || '';
+      const v = txt.replace('监控对象：', '').trim();
+      if (v && v !== '--') return v;
+    }
+    return '';
+  }
+
+  function setCurrentTargetUi(target){
+    const name = String(target || '').trim();
+    if (!name) return;
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) now.innerHTML = '当前监控对象：<b>' + name + '</b>';
+
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) pill.textContent = '监控对象：' + name;
+
+    const input = getTargetInputElement();
+    if (input && input.value !== name) input.value = name;
+  }
+
+  function resetAllControlSlidersToZero(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，控制滑块已清零。');
+  }
+
+  async function forceSmartModeAndZeroControl(){
+    if (!esp32Base) return;
+    try {
+      await fetch(esp32Base + '/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'smart', fan: 0, pump: 0, servo: 0, reason: 'switch_monitor_target' })
+      });
+      currentMode = 'smart';
+      refreshModeButtons();
+      setText('mode_note', '已发送给 AI 大模型并立即调节到适宜环境。');
+    } catch (e) {
+      console.warn('forceSmartModeAndZeroControl error:', e);
+    }
+  }
+
+  async function submitTargetToAiAndAdjust(){
+    const input = getTargetInputElement();
+    const target = String(input ? input.value : '').trim();
+
+    if (!esp32Base) {
+      setText('mode_note', '请先连接 ESP32，再提交检测对象。');
+      return;
+    }
+    if (!target) {
+      setText('mode_note', '请输入检测对象后再点击确定。');
+      return;
+    }
+
+    const oldTarget = lastSubmittedTarget || getCurrentTargetText();
+
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plant: target,
+          monitor_target: target,
+          trigger_ai: true,
+          immediate: true,
+          action: 'search_growth_environment_and_adjust'
+        })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+
+      const data = await resp.json();
+      const appliedTarget =
+        data && typeof data.monitor_target === 'string' && data.monitor_target.trim() ? data.monitor_target.trim() :
+        data && typeof data.target === 'string' && data.target.trim() ? data.target.trim() :
+        data && typeof data.plant === 'string' && data.plant.trim() ? data.plant.trim() :
+        target;
+
+      setCurrentTargetUi(appliedTarget);
+      lastSubmittedTarget = appliedTarget;
+
+      if (oldTarget && oldTarget !== appliedTarget) {
+        resetAllControlSlidersToZero();
+      }
+
+      await forceSmartModeAndZeroControl();
+      await refreshAll();
+      setText('mode_note', '当前监控对象：' + appliedTarget + '，AI 已开始检索适宜生长环境并执行调节。');
+    } catch (err) {
+      console.error('submitTargetToAiAndAdjust error:', err);
+      setText('mode_note', '检测对象提交失败，请检查 ESP32 地址与网络。');
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    const target = e && e.target;
+    if (!target || !target.id) return;
+    if (target.id === 'plant_v2_btn' || target.id === 'plant_target_btn') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      submitTargetToAiAndAdjust();
+    }
+  }, true);
+
+  document.addEventListener('keydown', function(e){
+    if (!e || e.key !== 'Enter') return;
+    const target = e.target;
+    if (!target || !target.id) return;
+    if (target.id === 'plant_v2_input' || target.id === 'plant_target_input') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      submitTargetToAiAndAdjust();
+    }
+  }, true);
+})();
+
+/* ===== 仅追加：只保留一个监控对象输入区 + 中文文案 ===== */
+(function plantTargetSingleUiCnFix(){
+  function applySingleUiCn(){
+    const oldBox = document.querySelector('.plant-box');
+    if (oldBox) oldBox.style.display = 'none';
+
+    const oldPill = document.getElementById('plant_target_pill');
+    if (oldPill) oldPill.style.display = 'none';
+
+    const title = document.querySelector('.plant-v2-title');
+    if (title) title.textContent = '检测对象';
+
+    const input = document.getElementById('plant_v2_input');
+    if (input) input.placeholder = '请输入检测对象（支持中文），例如：桉树、番茄、黄瓜';
+
+    const btn = document.getElementById('plant_v2_btn');
+    if (btn) btn.textContent = '确定监控对象';
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) {
+      const txt = String(now.textContent || '').trim();
+      if (!txt || txt.indexOf('当前监控对象') === -1) {
+        now.innerHTML = '当前监控对象：<b>--</b>';
+      }
+    }
+  }
+
+  applySingleUiCn();
+  setTimeout(applySingleUiCn, 0);
+  setTimeout(applySingleUiCn, 200);
+
+  const observer = new MutationObserver(function(){
+    applySingleUiCn();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
+
 init();
 setInterval(refreshAll, 10000);
 setInterval(loadHistory, 300000);

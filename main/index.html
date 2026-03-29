@@ -5,329 +5,1316 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>智慧农业监测平台</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-*{margin:0;padding:0;box-sizing:border-box}
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0e17;--card:rgba(255,255,255,.04);--card-b:rgba(255,255,255,.08);
-  --t1:#f0f4ff;--t2:rgba(255,255,255,.55);--t3:rgba(255,255,255,.3);
-  --green:#00d97e;--blue:#3b82f6;--orange:#f59e0b;--red:#ef4444;
-  --purple:#a855f7;--cyan:#06b6d4;--pink:#ec4899;
-  --glow-g:0 0 20px rgba(0,217,126,.15);--glow-b:0 0 20px rgba(59,130,246,.15);
+  --bg:#fff;
+  --panel:#fff;
+  --line:#e7edf0;
+  --line-strong:#d3dde2;
+  --text:#17323d;
+  --muted:#6d8792;
+  --green:#2f9e44;
+  --blue:#1c7ed6;
+  --orange:#f08c00;
+  --cyan:#0b7285;
+  --danger:#e03131;
+  --shadow:0 8px 24px rgba(15,23,42,.05);
 }
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
-  background:radial-gradient(ellipse at 30% 20%,rgba(59,130,246,.06) 0%,transparent 50%),
-             radial-gradient(ellipse at 70% 80%,rgba(0,217,126,.04) 0%,transparent 50%);
-  z-index:0;pointer-events:none}
-
-.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:16px}
-
-/* Header */
-.hdr{text-align:center;padding:30px 20px 20px}
-.hdr h1{font-size:1.8em;font-weight:700;letter-spacing:-.5px;
-  background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hdr .sub{color:var(--t2);font-size:.85em;margin-top:6px;font-weight:300}
-.status-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px}
-.pulse{width:8px;height:8px;border-radius:50%;background:var(--red);position:relative}
-.pulse.on{background:var(--green)}
-.pulse.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;background:var(--green);opacity:.4;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.8);opacity:0}}
-.status-txt{font-size:.78em;color:var(--t2)}
-
-/* Section */
-.sec{margin-top:24px}
-.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:0 4px}
-.sec-hdr .badge{padding:3px 10px;border-radius:20px;font-size:.7em;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-.badge-env{background:rgba(59,130,246,.15);color:var(--blue)}
-.badge-soil{background:rgba(0,217,126,.15);color:var(--green)}
-.badge-npk{background:rgba(245,158,11,.15);color:var(--orange)}
-.sec-hdr .sec-title{font-size:.85em;color:var(--t2);font-weight:500}
-
-/* Cards */
-.grid{display:grid;gap:12px}
-.grid-4{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
-.grid-3{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
-.card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px 16px;
-  position:relative;overflow:hidden;transition:all .3s ease}
-.card:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);transform:translateY(-2px)}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px;opacity:.8}
-.card.c-blue::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
-.card.c-green::before{background:linear-gradient(90deg,var(--green),#34d399)}
-.card.c-orange::before{background:linear-gradient(90deg,var(--orange),var(--red))}
-.card.c-purple::before{background:linear-gradient(90deg,var(--purple),var(--pink))}
-.card .lbl{font-size:.72em;color:var(--t3);font-weight:500;text-transform:uppercase;letter-spacing:.8px}
-.card .val{font-size:1.9em;font-weight:700;margin:6px 0 2px;line-height:1;
-  background:linear-gradient(180deg,var(--t1) 40%,var(--t2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.card .unit{font-size:.7em;color:var(--t3);font-weight:400}
-.card .ico{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:2.2em;opacity:.08}
-
-/* Chart */
-.chart-wrap{margin-top:24px}
-.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.tab{padding:6px 16px;border-radius:10px;font-size:.75em;font-weight:500;cursor:pointer;
-  background:var(--card);border:1px solid var(--card-b);color:var(--t2);transition:all .2s}
-.tab:hover{background:rgba(255,255,255,.08)}
-.tab.active{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:var(--blue)}
-.chart-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:20px}
-.chart-card canvas{width:100%!important;height:240px!important}
-
-/* Control */
-.ctrl-card{background:var(--card);border:1px solid var(--card-b);border-radius:16px;padding:16px}
-.mode-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.btn{padding:8px 14px;border-radius:10px;border:1px solid var(--card-b);background:rgba(255,255,255,.04);color:var(--t2);cursor:pointer;font-size:.78em}
-.btn.active{background:rgba(0,217,126,.15);border-color:rgba(0,217,126,.35);color:var(--green)}
-.ctl-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:10px;margin:10px 0}
-.ctl-row label{font-size:.78em;color:var(--t2)}
-.ctl-row input[type=range]{width:100%}
-.ctl-row span{font-size:.78em;color:var(--t1);text-align:right}
-.hint{font-size:.72em;color:var(--t3);margin-top:8px}
-
-/* Footer */
-.ftr{text-align:center;padding:24px;margin-top:20px;border-top:1px solid var(--card-b)}
-.ftr span{font-size:.7em;color:var(--t3);font-weight:400}
-.ftr .tag{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--card);
-  border:1px solid var(--card-b);margin:0 4px;font-family:monospace;font-size:.72em;color:var(--t2)}
-
-/* Responsive */
-@media(max-width:480px){
-  .hdr h1{font-size:1.4em}
-  .card .val{font-size:1.5em}
-  .grid{gap:8px}
-  .card{padding:16px 12px}
+body{
+  font-family:'Noto Sans SC','Microsoft YaHei',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+.page{
+  max-width:1200px;
+  margin:0 auto;
+  padding:28px 16px 40px;
+}
+.hero{
+  text-align:center;
+  padding:8px 0 12px;
+}
+.hero h1{
+  font-size:40px;
+  font-weight:800;
+  color:#205c33;
+}
+.hero p{
+  margin-top:10px;
+  font-size:14px;
+  color:var(--muted);
+}
+.status{
+  margin:18px auto 0;
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 16px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#fff;
+  box-shadow:var(--shadow);
+}
+.dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--danger);
+}
+.dot.on{background:var(--green)}
+.pill{
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f4f7f8;
+  color:#47616c;
+  font-size:12px;
+  font-weight:700;
+}
+.api-box{
+  margin:18px auto 0;
+  max-width:760px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+.api-input{
+  width:min(440px,90vw);
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:14px;
+  color:var(--text);
+  background:#fff;
+}
+.api-btn{
+  border:1px solid var(--green);
+  border-radius:12px;
+  background:var(--green);
+  color:#fff;
+  padding:10px 16px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.api-tip{
+  width:100%;
+  font-size:13px;
+  color:var(--muted);
+  text-align:center;
+}
+.section{margin-top:26px}
+.section-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:14px;
+}
+.badge{
+  padding:6px 12px;
+  border-radius:999px;
+  background:#f3f6f8;
+  color:#3a5360;
+  font-size:12px;
+  font-weight:700;
+}
+.section-title{
+  font-size:24px;
+  font-weight:800;
+}
+.section-sub{
+  font-size:14px;
+  color:var(--muted);
+}
+.grid{display:grid;gap:14px}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.metric .name{font-size:14px;color:var(--muted)}
+.metric .value{
+  margin-top:14px;
+  font-size:48px;
+  line-height:1;
+  font-weight:800;
+}
+.metric .unit{
+  margin-top:8px;
+  font-size:14px;
+  color:var(--muted);
+}
+.v-green{color:var(--green)}
+.v-blue{color:var(--blue)}
+.v-orange{color:var(--orange)}
+.v-cyan{color:var(--cyan)}
+.panel-title{
+  margin-bottom:10px;
+  font-size:16px;
+  font-weight:700;
+}
+.panel-body{
+  min-height:88px;
+  line-height:1.7;
+  color:#334d57;
+  white-space:pre-wrap;
+}
+.panel-body.empty{color:#8aa0aa}
+.mini-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.mini{
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:12px 14px;
+  background:#fcfdfe;
+}
+.mini .k{
+  font-size:12px;
+  color:var(--muted);
+}
+.mini .v{
+  margin-top:8px;
+  font-size:22px;
+  font-weight:800;
+}
+.mode-actions{
+  margin-top:14px;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.mode-btn{
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  background:#fff;
+  color:#46606b;
+  padding:10px 18px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+}
+.mode-btn.active{
+  background:var(--green);
+  border-color:var(--green);
+  color:#fff;
+}
+.mode-note{
+  margin-top:10px;
+  font-size:13px;
+  color:var(--muted);
+}
+.manual-panel{
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid var(--line);
+}
+.slider-row{
+  display:grid;
+  grid-template-columns:92px 1fr 74px;
+  gap:12px;
+  align-items:center;
+  margin-top:12px;
+}
+.slider-row label{
+  font-size:14px;
+  color:var(--text);
+  font-weight:700;
+}
+.slider-row input[type="range"]{
+  width:100%;
+}
+.slider-value{
+  text-align:right;
+  font-size:14px;
+  color:var(--muted);
+  font-weight:700;
+}
+.manual-tip{
+  margin-top:12px;
+  font-size:13px;
+  color:var(--muted);
+}
+.tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.tab{
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  background:#fff;
+  color:#48616c;
+  padding:8px 16px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:700;
+}
+.tab.active{
+  background:var(--green);
+  border-color:var(--green);
+  color:#fff;
+}
+.chart-wrap{height:320px}
+.foot{
+  margin-top:24px;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.8;
+}
+.loading{
+  position:fixed;
+  inset:0;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  z-index:100;
+  transition:opacity .3s ease;
+}
+.loading.hide{
+  opacity:0;
+  pointer-events:none;
+}
+.spinner{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:3px solid #dbe4e8;
+  border-top-color:var(--green);
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:980px){
+  .grid-4,.grid-3,.grid-2,.mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .hero h1{font-size:30px}
+  .grid-4,.grid-3,.grid-2,.mini-grid{grid-template-columns:1fr}
+  .metric .value{font-size:40px}
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="hdr">
-    <h1>智慧农业环境监测平台</h1>
-    <div class="sub">Smart Agriculture Monitoring System</div>
-    <div class="status-bar">
-      <div class="pulse" id="dot"></div>
-      <span class="status-txt" id="stxt">Connecting...</span>
-    </div>
-  </div>
+<div class="loading" id="loader">
+  <div class="spinner"></div>
+  <div>正在加载 OneNet 和 ESP32 数据...</div>
+</div>
 
-  <div class="sec">
-    <div class="sec-hdr"><span class="badge badge-env">ENV</span><span class="sec-title">环境参数</span></div>
+<div class="page">
+  <header class="hero">
+    <h1>智慧农业监测平台</h1>
+    <p>传感器数据与趋势图来自 OneNet，异常与 AI 回复直接来自 ESP32</p>
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="status_text">正在连接...</span>
+      <span class="pill">OneNet</span>
+      <span class="pill" id="source_text">需填ESP32地址</span>
+    </div>
+    <div class="api-box">
+      <input class="api-input" id="esp32_base" placeholder="ESP32 地址，例如 http://10.62.25.1">
+      <button class="api-btn" onclick="saveEsp32Base()">连接 ESP32</button>
+      <div class="api-tip">如果网页部署在 GitHub Pages，请填写开发板的局域网地址。也可在链接后追加 `?esp32=http://10.62.25.1`。</div>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">环境</span>
+      <div>
+        <div class="section-title">环境参数</div>
+        <div class="section-sub">来自 OneNet 最新物模型属性</div>
+      </div>
+    </div>
     <div class="grid grid-4">
-      <div class="card c-blue"><div class="lbl">光照强度</div><div class="val" id="lux">--</div><div class="unit">lx</div><div class="ico">&#9728;</div></div>
-      <div class="card c-orange"><div class="lbl">环境温度</div><div class="val" id="env_temp">--</div><div class="unit">&#8451;</div><div class="ico">&#127777;</div></div>
-      <div class="card c-blue"><div class="lbl">环境湿度</div><div class="val" id="env_humi">--</div><div class="unit">%</div><div class="ico">&#128167;</div></div>
-      <div class="card c-purple"><div class="lbl">大气压</div><div class="val" id="press">--</div><div class="unit">hPa</div><div class="ico">&#127744;</div></div>
+      <div class="card metric"><div class="name">光照强度</div><div class="value v-orange" id="lux">--</div><div class="unit">lux</div></div>
+      <div class="card metric"><div class="name">环境温度</div><div class="value v-orange" id="env_temp">--</div><div class="unit">℃</div></div>
+      <div class="card metric"><div class="name">环境湿度</div><div class="value v-blue" id="env_humi">--</div><div class="unit">%</div></div>
+      <div class="card metric"><div class="name">大气气压</div><div class="value v-green" id="press">--</div><div class="unit">hPa</div></div>
     </div>
-  </div>
+  </section>
 
-  <div class="sec">
-    <div class="sec-hdr"><span class="badge badge-soil">SOIL</span><span class="sec-title">土壤参数</span></div>
-    <div class="grid grid-3">
-      <div class="card c-orange"><div class="lbl">土壤温度</div><div class="val" id="soil_temp">--</div><div class="unit">&#8451;</div><div class="ico">&#127777;</div></div>
-      <div class="card c-green"><div class="lbl">土壤湿度</div><div class="val" id="soil_humi">--</div><div class="unit">%</div><div class="ico">&#128167;</div></div>
-      <div class="card c-purple"><div class="lbl">pH 值</div><div class="val" id="ph">--</div><div class="unit">pH</div><div class="ico">&#129514;</div></div>
-    </div>
-  </div>
-
-  <div class="sec">
-    <div class="sec-hdr"><span class="badge badge-npk">NPK</span><span class="sec-title">土壤养分</span></div>
-    <div class="grid grid-3">
-      <div class="card c-green"><div class="lbl">氮 Nitrogen</div><div class="val" id="n">--</div><div class="unit">mg/kg</div><div class="ico">N</div></div>
-      <div class="card c-blue"><div class="lbl">磷 Phosphorus</div><div class="val" id="p">--</div><div class="unit">mg/kg</div><div class="ico">P</div></div>
-      <div class="card c-orange"><div class="lbl">钾 Potassium</div><div class="val" id="k">--</div><div class="unit">mg/kg</div><div class="ico">K</div></div>
-    </div>
-  </div>
-
-  <div class="chart-wrap">
-    <div class="sec-hdr"><span class="badge badge-env">TREND</span><span class="sec-title">趋势图表</span></div>
-    <div class="tabs">
-      <div class="tab active" onclick="switchChart(0)">温湿度</div>
-      <div class="tab" onclick="switchChart(1)">光照</div>
-      <div class="tab" onclick="switchChart(2)">土壤</div>
-      <div class="tab" onclick="switchChart(3)">pH</div>
-    </div>
-    <div class="chart-card"><canvas id="chart"></canvas></div>
-  </div>
-
-  <div class="sec">
-    <div class="sec-hdr"><span class="badge badge-soil">CTRL</span><span class="sec-title">设备控制</span></div>
-    <div class="ctrl-card">
-      <div class="mode-row">
-        <button class="btn active" id="btn_manual" onclick="setMode('manual')">人工模式</button>
-        <button class="btn" id="btn_smart" onclick="setMode('smart')">智能模式</button>
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">土壤</span>
+      <div>
+        <div class="section-title">土壤参数</div>
+        <div class="section-sub">温度、湿度和酸碱度</div>
       </div>
-      <div id="manual_panel">
-        <div class="ctl-row"><label>风扇速度</label><input id="fan" type="range" min="0" max="100" value="0" oninput="onManualSlider()"><span id="fan_v">0</span></div>
-        <div class="ctl-row"><label>水泵速度</label><input id="pump" type="range" min="0" max="100" value="0" oninput="onManualSlider()"><span id="pump_v">0</span></div>
-        <div class="ctl-row"><label>舵机角度</label><input id="servo" type="range" min="0" max="180" value="90" oninput="onManualSlider()"><span id="servo_v">90</span></div>
-        <div class="mode-row" style="margin-top:8px">
-          <button class="btn active" onclick="sendManualControl()">下发人工控制</button>
+    </div>
+    <div class="grid grid-3">
+      <div class="card metric"><div class="name">土壤温度</div><div class="value v-orange" id="soil_temp">--</div><div class="unit">℃</div></div>
+      <div class="card metric"><div class="name">土壤湿度</div><div class="value v-green" id="soil_humi">--</div><div class="unit">%</div></div>
+      <div class="card metric"><div class="name">酸碱度</div><div class="value v-cyan" id="ph">--</div><div class="unit">pH</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">养分</span>
+      <div>
+        <div class="section-title">土壤养分</div>
+        <div class="section-sub">氮磷钾当前值</div>
+      </div>
+    </div>
+    <div class="grid grid-3">
+      <div class="card metric"><div class="name">氮含量</div><div class="value v-green" id="n">--</div><div class="unit">mg/kg</div></div>
+      <div class="card metric"><div class="name">磷含量</div><div class="value v-blue" id="p">--</div><div class="unit">mg/kg</div></div>
+      <div class="card metric"><div class="name">钾含量</div><div class="value v-orange" id="k">--</div><div class="unit">mg/kg</div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">诊断</span>
+      <div>
+        <div class="section-title">异常与 AI 信息</div>
+        <div class="section-sub">直接读取 ESP32 `/api/data` 返回的 `alert` 和 `ai_reply` 字段</div>
+      </div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="panel-title">检测到的异常</div>
+        <div class="panel-body empty" id="alert_text">等待 ESP32 返回异常信息...</div>
+      </div>
+      <div class="card">
+        <div class="panel-title">大模型回复</div>
+        <div class="panel-body empty" id="ai_reply_text">等待 ESP32 返回大模型回复...</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">状态</span>
+      <div>
+        <div class="section-title">平台状态</div>
+        <div class="section-sub">控制模式、最近策略与更新时间来自 ESP32</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="mini-grid">
+        <div class="mini"><div class="k">控制模式</div><div class="v v-green" id="mode_name">--</div></div>
+        <div class="mini"><div class="k">最近策略</div><div class="v v-blue" id="reason_text">--</div></div>
+        <div class="mini"><div class="k">更新时间</div><div class="v v-orange" id="updated_text">--</div></div>
+      </div>
+      <div class="mode-actions">
+        <button class="mode-btn" id="btn_manual" onclick="setControlMode('manual')">切换人工模式</button>
+        <button class="mode-btn" id="btn_smart" onclick="setControlMode('smart')">切换智能模式</button>
+      </div>
+      <div class="mode-note" id="mode_note">点击按钮后会通过 ESP32 下发模式切换指令。</div>
+      <div class="manual-panel">
+        <div class="slider-row">
+          <label for="fan_slider">风扇</label>
+          <input id="fan_slider" type="range" min="0" max="100" value="0" oninput="updateManualValue('fan')" onchange="sendManualControl('fan')">
+          <div class="slider-value" id="fan_value">0%</div>
         </div>
+        <div class="slider-row">
+          <label for="pump_slider">水泵</label>
+          <input id="pump_slider" type="range" min="0" max="100" value="0" oninput="updateManualValue('pump')" onchange="sendManualControl('pump')">
+          <div class="slider-value" id="pump_value">0%</div>
+        </div>
+        <div class="slider-row">
+          <label for="servo_slider">舵机</label>
+          <input id="servo_slider" type="range" min="0" max="180" value="90" oninput="updateManualValue('servo')" onchange="sendManualControl('servo')">
+          <div class="slider-value" id="servo_value">90°</div>
+        </div>
+        <div class="manual-tip" id="manual_tip">人工模式下，拖动滑块后会立即通过 ESP32 下发给 STM32。</div>
       </div>
-      <div class="hint" id="ctrl_hint">当前模式：人工</div>
-      <div class="hint" id="ctrl_reason">最近策略：init</div>
     </div>
-  </div>
+  </section>
 
-  <div class="ftr">
-    <span>SEQ <span class="tag" id="seq">-</span> OK <span class="tag" id="ok">0</span> FAIL <span class="tag" id="fail">0</span></span>
-    <br><br>
-    <span style="opacity:.4">Smart Agriculture IoT Platform &middot; ESP32 + LoRa + OneNet</span>
+  <section class="section">
+    <div class="section-head">
+      <span class="badge">趋势</span>
+      <div>
+        <div class="section-title">24 小时变化趋势</div>
+        <div class="section-sub">来自 OneNet 属性历史接口</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(0)">温度</button>
+        <button class="tab" onclick="switchTab(1)">湿度</button>
+        <button class="tab" onclick="switchTab(2)">光照</button>
+        <button class="tab" onclick="switchTab(3)">酸碱度</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div>数据来源：中国移动 OneNet 物联网平台 + ESP32 本地接口</div>
+    <div id="last_refresh">最近刷新：--</div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
-var curTab=0,chart=null,histData=[];
-var curMode='manual';
-var C={
-  blue:'#3b82f6',cyan:'#06b6d4',green:'#00d97e',orange:'#f59e0b',
-  red:'#ef4444',purple:'#a855f7',pink:'#ec4899'
-};
+const ONENET_PRODUCT_ID = 'W9BY3SlO8w';
+const ONENET_DEVICE_NAME = 'dachuang';
+const ONENET_API_BASE = 'https://iot-api.heclouds.com';
+const ONENET_KEY_B64 = 'aDFIWDNUeFpLTTdUTzdCS1VzdWlyV3JLS3pnR2tkdVU=';
+const ONENET_ET = '2057492169';
 
-function fmtTime(s){var m=Math.floor(s/60),ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
+let cachedToken = null;
+let chart = null;
+let currentTab = 0;
+let historyCache = {};
+let esp32Base = '';
+let currentMode = '';
+let manualState = { fan: 0, pump: 0, servo: 90 };
 
-function chartCfg(labels,datasets){
-  return{
-    type:'line',data:{labels:labels,datasets:datasets},
-    options:{
-      animation:{duration:400,easing:'easeOutQuart'},
-      responsive:true,maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{position:'bottom',labels:{color:'rgba(255,255,255,.5)',boxWidth:10,padding:16,font:{size:11,family:'Inter'}}}
-      },
-      scales:{
-        x:{ticks:{maxTicksLimit:8,color:'rgba(255,255,255,.25)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},border:{color:'transparent'}},
-        y:{ticks:{color:'rgba(255,255,255,.25)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'},border:{color:'transparent'}}
-      },
-      elements:{point:{radius:0,hoverRadius:4},line:{borderWidth:2.5}}
-    }
-  };
+const tabConfigs = [
+  { ids: ['env_temp', 'soil_temp'], labels: ['环境温度', '土壤温度'], colors: ['#f08c00', '#e03131'] },
+  { ids: ['env_humi', 'soil_humi'], labels: ['环境湿度', '土壤湿度'], colors: ['#1c7ed6', '#2f9e44'] },
+  { ids: ['lux'], labels: ['光照强度'], colors: ['#f59f00'] },
+  { ids: ['ph'], labels: ['酸碱度'], colors: ['#0b7285'] }
+];
+
+function setText(id, text){
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
 
-function mkDS(label,data,color){
-  return{label:label,data:data,borderColor:color,
-    backgroundColor:function(ctx){
-      var g=ctx.chart.ctx.createLinearGradient(0,0,0,240);
-      g.addColorStop(0,color+'30');g.addColorStop(1,color+'00');return g;
-    },fill:true,tension:0.4};
+function setPanelText(id, text, fallback){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const content = text && String(text).trim() ? String(text).trim() : fallback;
+  el.textContent = content;
+  el.className = 'panel-body' + (content === fallback ? ' empty' : '');
 }
 
-function buildChart(){
-  var labels=histData.map(function(p){return fmtTime(p.t)});
-  var ds=[];
-  if(curTab===0){
-    ds=[mkDS('环境温度 (°C)',histData.map(function(p){return p.et}),C.orange),
-        mkDS('环境湿度 (%)',histData.map(function(p){return p.eh}),C.blue)];
-  }else if(curTab===1){
-    ds=[mkDS('光照 (lx)',histData.map(function(p){return p.lx}),C.cyan)];
-  }else if(curTab===2){
-    ds=[mkDS('土壤温度 (°C)',histData.map(function(p){return p.st}),C.orange),
-        mkDS('土壤湿度 (%)',histData.map(function(p){return p.sh}),C.green)];
-  }else{
-    ds=[mkDS('pH',histData.map(function(p){return p.ph}),C.purple)];
+function normalizeBase(url){
+  return String(url || '').trim().replace(/\/+$/, '');
+}
+
+function loadEsp32Base(){
+  const queryBase = new URLSearchParams(window.location.search).get('esp32');
+  const localBase = localStorage.getItem('esp32_base');
+  esp32Base = normalizeBase(queryBase || localBase || '');
+  const input = document.getElementById('esp32_base');
+  if (input) input.value = esp32Base;
+  setText('source_text', esp32Base ? 'ESP32已配置' : '需填ESP32地址');
+}
+
+function saveEsp32Base(){
+  const input = document.getElementById('esp32_base');
+  esp32Base = normalizeBase(input ? input.value : '');
+  localStorage.setItem('esp32_base', esp32Base);
+  setText('source_text', esp32Base ? 'ESP32已配置' : '需填ESP32地址');
+  refreshAll();
+}
+
+function refreshModeButtons(){
+  const manualBtn = document.getElementById('btn_manual');
+  const smartBtn = document.getElementById('btn_smart');
+  if (!manualBtn || !smartBtn) return;
+  manualBtn.className = 'mode-btn' + (currentMode === 'manual' ? ' active' : '');
+  smartBtn.className = 'mode-btn' + (currentMode === 'smart' ? ' active' : '');
+}
+
+function updateManualValue(key){
+  const slider = document.getElementById(key + '_slider');
+  const value = Number(slider ? slider.value : 0);
+  manualState[key] = value;
+  const suffix = key === 'servo' ? '°' : '%';
+  setText(key + '_value', value + suffix);
+}
+
+function syncManualControls(data){
+  if (data && typeof data.fan === 'number') manualState.fan = data.fan;
+  if (data && typeof data.pump === 'number') manualState.pump = data.pump;
+  if (data && typeof data.servo === 'number') manualState.servo = data.servo;
+
+  const fanSlider = document.getElementById('fan_slider');
+  const pumpSlider = document.getElementById('pump_slider');
+  const servoSlider = document.getElementById('servo_slider');
+  if (fanSlider) fanSlider.value = manualState.fan;
+  if (pumpSlider) pumpSlider.value = manualState.pump;
+  if (servoSlider) servoSlider.value = manualState.servo;
+
+  updateManualValue('fan');
+  updateManualValue('pump');
+  updateManualValue('servo');
+}
+
+async function sendManualControl(source){
+  if (currentMode !== 'manual') {
+    setText('manual_tip', '当前是智能模式，请先切换到人工模式再手动调节。');
+    syncManualControls();
+    return;
   }
-  if(chart){chart.destroy();}
-  chart=new Chart(document.getElementById('chart'),chartCfg(labels,ds));
-}
-
-function switchChart(i){
-  curTab=i;
-  var tabs=document.querySelectorAll('.tab');
-  for(var j=0;j<tabs.length;j++) tabs[j].className='tab'+(j===i?' active':'');
-  buildChart();
-}
-
-function animateValue(el,val){el.textContent=val;}
-
-function onManualSlider(){
-  document.getElementById('fan_v').textContent=document.getElementById('fan').value;
-  document.getElementById('pump_v').textContent=document.getElementById('pump').value;
-  document.getElementById('servo_v').textContent=document.getElementById('servo').value;
-}
-
-function refreshModeUI(){
-  var isSmart=curMode==='smart';
-  document.getElementById('btn_manual').className='btn'+(isSmart?'':' active');
-  document.getElementById('btn_smart').className='btn'+(isSmart?' active':'');
-  document.getElementById('manual_panel').style.opacity=isSmart?0.45:1;
-  document.getElementById('manual_panel').style.pointerEvents=isSmart?'none':'auto';
-  document.getElementById('ctrl_hint').textContent='当前模式：'+(isSmart?'智能（大模型自动调节）':'人工（网页手动控制）');
-}
-
-function setMode(mode){
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      curMode=d.mode||mode;
-      if(typeof d.reason==='string') document.getElementById('ctrl_reason').textContent='最近策略：'+d.reason;
-      refreshModeUI();
+  if (!esp32Base) {
+    setText('manual_tip', '请先填写 ESP32 地址，再通过滑块下发指令。');
+    return;
+  }
+  try {
+    const resp = await fetch(esp32Base + '/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'manual',
+        fan: manualState.fan,
+        pump: manualState.pump,
+        servo: manualState.servo
+      })
     });
+    if (!resp.ok) {
+      throw new Error('ESP32 API HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    if (data && typeof data.mode === 'string') currentMode = data.mode;
+    syncManualControls(data);
+    refreshModeButtons();
+    setText('manual_tip', source === 'fan' ? '风扇指令已下发到 STM32。' : source === 'pump' ? '水泵指令已下发到 STM32。' : '舵机指令已下发到 STM32。');
+    await refreshAll();
+  } catch (err) {
+    console.error('sendManualControl error:', err);
+    setText('manual_tip', '手动控制下发失败，请检查 ESP32 地址和网络连接。');
+  }
 }
 
-function sendManualControl(){
-  var payload={
-    mode:'manual',
-    fan:parseInt(document.getElementById('fan').value,10),
-    pump:parseInt(document.getElementById('pump').value,10),
-    servo:parseInt(document.getElementById('servo').value,10)
-  };
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      curMode=d.mode||'manual';
-      if(typeof d.reason==='string') document.getElementById('ctrl_reason').textContent='最近策略：'+d.reason;
-      refreshModeUI();
+async function setControlMode(mode){
+  if (!esp32Base) {
+    setText('mode_note', '请先填写 ESP32 地址，再切换模式。');
+    return;
+  }
+  try {
+    const resp = await fetch(esp32Base + '/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: mode })
     });
+    if (!resp.ok) {
+      throw new Error('ESP32 API HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    currentMode = data && typeof data.mode === 'string' ? data.mode : mode;
+    refreshModeButtons();
+    if (currentMode === 'manual') {
+      setText('manual_tip', '已切换到人工模式，现在拖动滑块即可下发到 STM32。');
+    } else {
+      setText('manual_tip', '当前是智能模式，滑块不会手动下发。');
+    }
+    setText('mode_note', currentMode === 'smart' ? '已切换到智能模式。' : '已切换到人工模式。');
+    await refreshAll();
+  } catch (err) {
+    console.error('setControlMode error:', err);
+    setText('mode_note', '模式切换失败，请检查 ESP32 地址和网络连接。');
+  }
 }
 
-function fetchControl(){
-  fetch('/api/control').then(function(r){return r.json()}).then(function(d){
-    curMode=d.mode||curMode;
-    if(typeof d.fan==='number') document.getElementById('fan').value=d.fan;
-    if(typeof d.pump==='number') document.getElementById('pump').value=d.pump;
-    if(typeof d.servo==='number') document.getElementById('servo').value=d.servo;
-    if(typeof d.reason==='string') document.getElementById('ctrl_reason').textContent='最近策略：'+d.reason;
-    onManualSlider();
-    refreshModeUI();
-  }).catch(function(){});
+function toFixedSafe(value, digits){
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(digits) : '--';
 }
 
-function update(){
-  fetch('/api/data').then(function(r){return r.json()}).then(function(d){
-    document.getElementById('dot').className='pulse on';
-    document.getElementById('stxt').textContent='Live \u00b7 '+new Date().toLocaleTimeString();
-    animateValue(document.getElementById('lux'),d.lux.toFixed(1));
-    animateValue(document.getElementById('env_temp'),d.env_temp.toFixed(1));
-    animateValue(document.getElementById('env_humi'),d.env_humi.toFixed(1));
-    animateValue(document.getElementById('press'),d.press.toFixed(1));
-    animateValue(document.getElementById('soil_temp'),d.soil_temp.toFixed(1));
-    animateValue(document.getElementById('soil_humi'),d.soil_humi.toFixed(1));
-    animateValue(document.getElementById('ph'),d.ph.toFixed(2));
-    animateValue(document.getElementById('n'),d.n);
-    animateValue(document.getElementById('p'),d.p);
-    animateValue(document.getElementById('k'),d.k);
-    document.getElementById('seq').textContent=d.seq;
-    document.getElementById('ok').textContent=d.ok;
-    document.getElementById('fail').textContent=d.fail;
-    if(d.mode){curMode=d.mode;refreshModeUI();}
-    if(typeof d.reason==='string') document.getElementById('ctrl_reason').textContent='最近策略：'+d.reason;
-  }).catch(function(){
-    document.getElementById('dot').className='pulse';
-    document.getElementById('stxt').textContent='Offline';
+function parseMapFromLatestResponse(resp){
+  const map = {};
+  if (!resp || !resp.data) return map;
+  if (Array.isArray(resp.data)) {
+    resp.data.forEach(function(item){
+      if (item && item.identifier) map[item.identifier] = item.value;
+    });
+  } else {
+    Object.keys(resp.data).forEach(function(key){
+      const item = resp.data[key];
+      map[key] = item && typeof item === 'object' && 'value' in item ? item.value : item;
+    });
+  }
+  return map;
+}
+
+async function generateToken(){
+  const res = 'products/' + ONENET_PRODUCT_ID + '/devices/' + ONENET_DEVICE_NAME;
+  const version = '2018-10-31';
+  const signStr = ONENET_ET + '\nsha256\n' + res + '\n' + version;
+  const keyBuf = Uint8Array.from(atob(ONENET_KEY_B64), function(c){ return c.charCodeAt(0); });
+  const key = await crypto.subtle.importKey('raw', keyBuf, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signStr));
+  const signB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(sig)));
+  return 'version=' + version + '&res=' + encodeURIComponent(res) + '&et=' + ONENET_ET + '&method=sha256&sign=' + encodeURIComponent(signB64);
+}
+
+async function getToken(){
+  if (!cachedToken) cachedToken = await generateToken();
+  return cachedToken;
+}
+
+async function oneNetGet(path){
+  const token = await getToken();
+  const resp = await fetch(ONENET_API_BASE + path, {
+    headers: { authorization: token },
+    cache: 'no-store'
+  });
+  if (!resp.ok) {
+    throw new Error('OneNet HTTP ' + resp.status);
+  }
+  return await resp.json();
+}
+
+async function fetchLatest(){
+  return await oneNetGet('/thingmodel/query-device-property?product_id=' + ONENET_PRODUCT_ID + '&device_name=' + ONENET_DEVICE_NAME);
+}
+
+async function fetchEsp32Status(){
+  if (!esp32Base) throw new Error('ESP32 base not configured');
+  const resp = await fetch(esp32Base + '/api/data', { cache: 'no-store' });
+  if (!resp.ok) {
+    throw new Error('ESP32 API HTTP ' + resp.status);
+  }
+  return await resp.json();
+}
+
+async function fetchHistory(identifier){
+  const end = Date.now();
+  const start = end - 24 * 3600 * 1000;
+  return await oneNetGet('/thingmodel/query-device-property-history?product_id=' + ONENET_PRODUCT_ID +
+    '&device_name=' + ONENET_DEVICE_NAME +
+    '&identifier=' + identifier +
+    '&start_time=' + start +
+    '&end_time=' + end +
+    '&limit=240&sort=asc');
+}
+
+function buildAlertText(values){
+  const alerts = [];
+  const envTemp = Number(values.env_temp);
+  const envHumi = Number(values.env_humi);
+  const soilTemp = Number(values.soil_temp);
+  const soilHumi = Number(values.soil_humi);
+  const ph = Number(values.ph);
+  const lux = Number(values.lux);
+
+  if (Number.isFinite(envTemp) && envTemp > 40) alerts.push('环境温度过高 ' + envTemp.toFixed(1) + '℃');
+  if (Number.isFinite(envTemp) && envTemp < 2) alerts.push('环境温度过低 ' + envTemp.toFixed(1) + '℃');
+  if (Number.isFinite(envHumi) && envHumi > 95) alerts.push('环境湿度过高 ' + envHumi.toFixed(0) + '%');
+  if (Number.isFinite(envHumi) && envHumi < 20) alerts.push('环境湿度过低 ' + envHumi.toFixed(0) + '%');
+  if (Number.isFinite(soilTemp) && soilTemp > 40) alerts.push('土壤温度过高 ' + soilTemp.toFixed(1) + '℃');
+  if (Number.isFinite(soilHumi) && soilHumi < 15) alerts.push('土壤湿度仅 ' + soilHumi.toFixed(0) + '%，建议浇水');
+  if (Number.isFinite(soilHumi) && soilHumi > 90) alerts.push('土壤湿度过高 ' + soilHumi.toFixed(0) + '%');
+  if (Number.isFinite(ph) && ph < 3.5) alerts.push('土壤 pH ' + ph.toFixed(2) + ' 偏酸');
+  if (Number.isFinite(ph) && ph > 9.0) alerts.push('土壤 pH ' + ph.toFixed(2) + ' 偏碱');
+  if (Number.isFinite(lux) && lux > 120000) alerts.push('光照过强 ' + lux.toFixed(0) + ' lux');
+
+  return alerts.length ? alerts.join('；') : '当前未检测到明显异常';
+}
+
+function updateDashboard(resp, esp32Data){
+  const values = parseMapFromLatestResponse(resp);
+  setText('lux', toFixedSafe(values.lux, 1));
+  setText('env_temp', toFixedSafe(values.env_temp, 1));
+  setText('env_humi', toFixedSafe(values.env_humi, 1));
+  setText('press', toFixedSafe(values.press, 1));
+  setText('soil_temp', toFixedSafe(values.soil_temp, 1));
+  setText('soil_humi', toFixedSafe(values.soil_humi, 1));
+  setText('ph', toFixedSafe(values.ph, 2));
+  setText('n', Number.isFinite(Number(values.n)) ? Math.round(Number(values.n)) : '--');
+  setText('p', Number.isFinite(Number(values.p)) ? Math.round(Number(values.p)) : '--');
+  setText('k', Number.isFinite(Number(values.k)) ? Math.round(Number(values.k)) : '--');
+
+  const alertText = esp32Data && typeof esp32Data.alert === 'string' ? esp32Data.alert : buildAlertText(values);
+  const aiReply = esp32Data && typeof esp32Data.ai_reply === 'string' ? esp32Data.ai_reply : '';
+  const mode = esp32Data && typeof esp32Data.mode === 'string' ? esp32Data.mode : '--';
+  const reason = esp32Data && typeof esp32Data.reason === 'string' ? esp32Data.reason : 'ESP32 暂未返回控制策略';
+  const updatedText = esp32Data && typeof esp32Data.updated === 'number' && esp32Data.updated > 0
+    ? new Date(esp32Data.updated * 1000).toLocaleString('zh-CN')
+    : new Date().toLocaleString('zh-CN');
+
+  setPanelText('alert_text', alertText, '当前未检测到明显异常');
+  setPanelText('ai_reply_text', aiReply, 'ESP32 暂未返回大模型回复');
+  currentMode = mode;
+  syncManualControls(esp32Data);
+  setText('mode_name', mode === 'smart' ? '智能' : mode === 'manual' ? '人工' : String(mode));
+  setText('reason_text', String(reason));
+  refreshModeButtons();
+  setText('manual_tip', currentMode === 'manual' ? '人工模式下，拖动滑块后会立即通过 ESP32 下发给 STM32。' : '当前是智能模式，滑块不会手动下发。');
+
+  document.getElementById('dot').className = 'dot on';
+  setText('status_text', esp32Data ? 'OneNet 在线 / ESP32 已连接' : 'OneNet 在线 / ESP32 未连接');
+  setText('updated_text', updatedText);
+  setText('last_refresh', '最近刷新：' + new Date().toLocaleString('zh-CN'));
+}
+
+function formatLabel(ts){
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function renderChart(){
+  const cfg = tabConfigs[currentTab];
+  const datasets = [];
+  let labels = [];
+
+  cfg.ids.forEach(function(id, index){
+    const list = historyCache[id] || [];
+    if (!list.length) return;
+    if (!labels.length) labels = list.map(function(item){ return formatLabel(item.time); });
+    datasets.push({
+      label: cfg.labels[index],
+      data: list.map(function(item){ return item.value; }),
+      borderColor: cfg.colors[index],
+      backgroundColor: cfg.colors[index],
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      borderWidth: 2,
+      tension: 0.25,
+      fill: false
+    });
+  });
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#4d6671',
+            boxWidth: 10,
+            padding: 16,
+            font: { family: 'Noto Sans SC', size: 12 }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#708892', maxTicksLimit: 8 },
+          grid: { color: '#eef2f4' },
+          border: { color: '#d8e1e6' }
+        },
+        y: {
+          ticks: { color: '#708892' },
+          grid: { color: '#eef2f4' },
+          border: { color: '#d8e1e6' }
+        }
+      }
+    }
   });
 }
 
-function fetchHistory(){
-  fetch('/api/history').then(function(r){return r.json()}).then(function(d){
-    histData=d;buildChart();
-  }).catch(function(){});
+async function loadHistory(){
+  const ids = ['env_temp', 'soil_temp', 'env_humi', 'soil_humi', 'lux', 'ph'];
+  for (const id of ids) {
+    const resp = await fetchHistory(id);
+    const list = resp && resp.data && Array.isArray(resp.data.list) ? resp.data.list : [];
+    historyCache[id] = list.map(function(item){
+      return { time: Number(item.time), value: Number(item.value) };
+    });
+  }
+  renderChart();
 }
 
-onManualSlider();
-update();fetchHistory();fetchControl();
-setInterval(update,2000);
-setInterval(fetchHistory,4000);
-setInterval(fetchControl,4000);
+function switchTab(index){
+  currentTab = index;
+  document.querySelectorAll('.tab').forEach(function(btn, idx){
+    btn.className = 'tab' + (idx === index ? ' active' : '');
+  });
+  renderChart();
+}
+
+async function refreshAll(){
+  try {
+    const latest = await fetchLatest();
+    if (!latest || latest.code !== 0) throw new Error('OneNet 返回异常');
+
+    let esp32Data = null;
+    try {
+      esp32Data = await fetchEsp32Status();
+      setText('source_text', 'ESP32已连接');
+    } catch (espErr) {
+      console.warn('ESP32 API error:', espErr);
+      setText('source_text', esp32Base ? 'ESP32连接失败' : '需填ESP32地址');
+    }
+
+    updateDashboard(latest, esp32Data);
+    document.getElementById('loader').classList.add('hide');
+  } catch (err) {
+    document.getElementById('dot').className = 'dot';
+    setText('status_text', 'OneNet 连接失败');
+    setPanelText('alert_text', '', 'OneNet 连接失败，暂时无法读取异常信息');
+    setPanelText('ai_reply_text', '', 'OneNet 连接失败，暂时无法读取 AI 回复');
+    console.error(err);
+  }
+}
+
+async function init(){
+  loadEsp32Base();
+  await refreshAll();
+  try {
+    await loadHistory();
+  } catch (err) {
+    console.error('loadHistory failed:', err);
+  } finally {
+    document.getElementById('loader').classList.add('hide');
+  }
+}
+
+/* ===== 仅追加：监控对象输入与显示增强 ===== */
+(function plantTargetEnhancement(){
+  let currentPlantTarget = '';
+
+  function ensurePlantStyle(){
+    if (document.getElementById('plant_target_style')) return;
+    const style = document.createElement('style');
+    style.id = 'plant_target_style';
+    style.textContent = [
+      '.plant-box{margin:10px auto 0;max-width:760px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}',
+      '.plant-input{width:min(320px,82vw);border:1px solid #d3dde2;border-radius:12px;padding:10px 12px;font-size:14px;color:#17323d;background:#fff}',
+      '.plant-btn{border:1px solid #1c7ed6;border-radius:12px;background:#1c7ed6;color:#fff;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer}',
+      '.plant-tip{width:100%;font-size:13px;color:#6d8792;text-align:center}',
+      '.plant-pill{background:#eef5ff;color:#1c5ca8}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  function ensurePlantUi(){
+    ensurePlantStyle();
+
+    const status = document.querySelector('.status');
+    if (status && !document.getElementById('plant_target_pill')) {
+      const pill = document.createElement('span');
+      pill.className = 'pill plant-pill';
+      pill.id = 'plant_target_pill';
+      pill.textContent = '监控对象：--';
+      status.appendChild(pill);
+    }
+
+    const apiBox = document.querySelector('.api-box');
+    if (apiBox && !document.getElementById('plant_target_input')) {
+      const box = document.createElement('div');
+      box.className = 'plant-box';
+      box.innerHTML = '' +
+        '<input class="plant-input" id="plant_target_input" placeholder="输入检测对象，例如：番茄 / 黄瓜 / 生菜">' +
+        '<button class="plant-btn" id="plant_target_btn" type="button">确定监控对象</button>' +
+        '<div class="plant-tip" id="plant_target_tip">提交后将发送到 ESP32 的 /api/plant，并触发立即调节。</div>';
+      apiBox.insertAdjacentElement('afterend', box);
+
+      const btn = document.getElementById('plant_target_btn');
+      if (btn) {
+        btn.addEventListener('click', function(){
+          setPlantTarget();
+        });
+      }
+    }
+  }
+
+  function setPlantTargetUi(name){
+    const normalized = String(name || '').trim();
+    if (!normalized) return;
+    currentPlantTarget = normalized;
+
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) pill.textContent = '监控对象：' + normalized;
+
+    const input = document.getElementById('plant_target_input');
+    if (input && input.value !== normalized) input.value = normalized;
+  }
+
+  function resetSlidersAfterPlantSwitch(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，滑块已清零。');
+  }
+
+  async function setPlantTarget(){
+    ensurePlantUi();
+
+    if (!esp32Base) {
+      setText('plant_target_tip', '请先填写 ESP32 地址，再设置监控对象。');
+      return;
+    }
+
+    const input = document.getElementById('plant_target_input');
+    const plant = String(input ? input.value : '').trim();
+    if (!plant) {
+      setText('plant_target_tip', '请输入检测对象后再提交。');
+      return;
+    }
+
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plant: plant })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      const target = data && typeof data.plant === 'string' ? data.plant : plant;
+      setPlantTargetUi(target);
+      resetSlidersAfterPlantSwitch();
+      setText('plant_target_tip', '监控对象已更新：' + target + '，已触发立即调节。');
+      await refreshAll();
+    } catch (err) {
+      console.error('setPlantTarget error:', err);
+      setText('plant_target_tip', '监控对象设置失败，请检查 ESP32 地址与网络。');
+    }
+  }
+
+  const oldUpdateDashboard = updateDashboard;
+  updateDashboard = function(resp, esp32Data){
+    oldUpdateDashboard(resp, esp32Data);
+    ensurePlantUi();
+    if (esp32Data && typeof esp32Data.plant === 'string' && String(esp32Data.plant).trim()) {
+      setPlantTargetUi(esp32Data.plant);
+    } else if (!currentPlantTarget) {
+      const pill = document.getElementById('plant_target_pill');
+      if (pill) pill.textContent = '监控对象：--';
+    }
+  };
+
+  window.setPlantTarget = setPlantTarget;
+  ensurePlantUi();
+})();
+
+/* ===== 仅追加：监控对象功能加强版（不改动原有代码） ===== */
+(function plantTargetEnhancementV2(){
+  function addStyleV2(){
+    if (document.getElementById('plant_target_style_v2')) return;
+    const style = document.createElement('style');
+    style.id = 'plant_target_style_v2';
+    style.textContent = [
+      '.plant-v2{margin:16px auto 0;max-width:760px;border:1px solid #dfe8ed;border-radius:14px;padding:12px;background:#fff}',
+      '.plant-v2-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}',
+      '.plant-v2-title{font-size:13px;color:#6d8792;font-weight:700;min-width:86px}',
+      '.plant-v2-input{flex:1 1 280px;min-width:240px;border:1px solid #cfdbe1;border-radius:10px;padding:9px 12px;font-size:14px;color:#17323d}',
+      '.plant-v2-btn{border:1px solid #2f9e44;background:#2f9e44;color:#fff;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;cursor:pointer}',
+      '.plant-v2-btn:disabled{opacity:.6;cursor:not-allowed}',
+      '.plant-v2-now{margin-top:9px;font-size:13px;color:#43606b}',
+      '.plant-v2-now b{color:#205c33}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  function ensureUiV2(){
+    addStyleV2();
+    if (document.getElementById('plant_v2_box')) return;
+
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+
+    const box = document.createElement('div');
+    box.className = 'plant-v2';
+    box.id = 'plant_v2_box';
+    box.innerHTML = '' +
+      '<div class="plant-v2-row">' +
+      '  <span class="plant-v2-title">检测对象</span>' +
+      '  <input id="plant_v2_input" class="plant-v2-input" placeholder="例如：番茄 / 黄瓜 / 草莓 / 生菜">' +
+      '  <button id="plant_v2_btn" class="plant-v2-btn" type="button">确定并立即调节</button>' +
+      '</div>' +
+      '<div id="plant_v2_now" class="plant-v2-now">当前监控对象：<b>--</b></div>';
+
+    hero.appendChild(box);
+
+    const btn = document.getElementById('plant_v2_btn');
+    const input = document.getElementById('plant_v2_input');
+    if (btn) {
+      btn.addEventListener('click', function(){
+        submitPlantV2();
+      });
+    }
+    if (input) {
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') {
+          submitPlantV2();
+        }
+      });
+    }
+  }
+
+  function setCurrentPlantV2(name){
+    const normalized = String(name || '').trim();
+    if (!normalized) return;
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) now.innerHTML = '当前监控对象：<b>' + normalized + '</b>';
+
+    const input = document.getElementById('plant_v2_input');
+    if (input && input.value !== normalized) input.value = normalized;
+  }
+
+  function clearSlidersOnPlantSwitchV2(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，控制滑块已清零。');
+  }
+
+  async function forceSmartModeV2(){
+    if (!esp32Base) return;
+    try {
+      await fetch(esp32Base + '/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'smart', fan: 0, pump: 0, servo: 0 })
+      });
+      currentMode = 'smart';
+      refreshModeButtons();
+      setText('mode_note', '对象已切换，已自动进入智能模式并触发即时调节。');
+    } catch (e) {
+      console.warn('forceSmartModeV2 failed:', e);
+    }
+  }
+
+  async function submitPlantV2(){
+    ensureUiV2();
+
+    const btn = document.getElementById('plant_v2_btn');
+    const input = document.getElementById('plant_v2_input');
+    const raw = input ? input.value : '';
+    const plant = String(raw || '').trim();
+
+    if (!esp32Base) {
+      setText('mode_note', '请先连接 ESP32，再提交检测对象。');
+      return;
+    }
+    if (!plant) {
+      setText('mode_note', '请输入检测对象后再点击确定。');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plant: plant })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      const appliedPlant = data && typeof data.plant === 'string' ? data.plant : plant;
+
+      setCurrentPlantV2(appliedPlant);
+      clearSlidersOnPlantSwitchV2();
+      await forceSmartModeV2();
+      await refreshAll();
+    } catch (err) {
+      console.error('submitPlantV2 error:', err);
+      setText('mode_note', '检测对象提交失败，请检查 ESP32 地址或网络。');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  const oldUpdateDashboardV2 = updateDashboard;
+  updateDashboard = function(resp, esp32Data){
+    oldUpdateDashboardV2(resp, esp32Data);
+    ensureUiV2();
+    if (esp32Data && typeof esp32Data.plant === 'string' && String(esp32Data.plant).trim()) {
+      setCurrentPlantV2(esp32Data.plant);
+    }
+  };
+
+  window.submitPlantV2 = submitPlantV2;
+  ensureUiV2();
+})();
+
+/* ===== 仅追加：监控对象业务逻辑兜底（AI联动 + 切换清零） ===== */
+(function plantTargetBusinessBridgeV3(){
+  let lastSubmittedTarget = '';
+
+  function getTargetInputElement(){
+    return document.getElementById('plant_v2_input') || document.getElementById('plant_target_input');
+  }
+
+  function getCurrentTargetText(){
+    const now = document.getElementById('plant_v2_now');
+    if (now) {
+      const txt = now.textContent || '';
+      const v = txt.replace('当前监控对象：', '').trim();
+      if (v && v !== '--') return v;
+    }
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) {
+      const txt = pill.textContent || '';
+      const v = txt.replace('监控对象：', '').trim();
+      if (v && v !== '--') return v;
+    }
+    return '';
+  }
+
+  function setCurrentTargetUi(target){
+    const name = String(target || '').trim();
+    if (!name) return;
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) now.innerHTML = '当前监控对象：<b>' + name + '</b>';
+
+    const pill = document.getElementById('plant_target_pill');
+    if (pill) pill.textContent = '监控对象：' + name;
+
+    const input = getTargetInputElement();
+    if (input && input.value !== name) input.value = name;
+  }
+
+  function resetAllControlSlidersToZero(){
+    manualState.fan = 0;
+    manualState.pump = 0;
+    manualState.servo = 0;
+    syncManualControls({ fan: 0, pump: 0, servo: 0 });
+    setText('manual_tip', '监控对象已切换，控制滑块已清零。');
+  }
+
+  async function forceSmartModeAndZeroControl(){
+    if (!esp32Base) return;
+    try {
+      await fetch(esp32Base + '/api/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'smart', fan: 0, pump: 0, servo: 0, reason: 'switch_monitor_target' })
+      });
+      currentMode = 'smart';
+      refreshModeButtons();
+      setText('mode_note', '已发送给 AI 大模型并立即调节到适宜环境。');
+    } catch (e) {
+      console.warn('forceSmartModeAndZeroControl error:', e);
+    }
+  }
+
+  async function submitTargetToAiAndAdjust(){
+    const input = getTargetInputElement();
+    const target = String(input ? input.value : '').trim();
+
+    if (!esp32Base) {
+      setText('mode_note', '请先连接 ESP32，再提交检测对象。');
+      return;
+    }
+    if (!target) {
+      setText('mode_note', '请输入检测对象后再点击确定。');
+      return;
+    }
+
+    const oldTarget = lastSubmittedTarget || getCurrentTargetText();
+
+    try {
+      const resp = await fetch(esp32Base + '/api/plant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plant: target,
+          monitor_target: target,
+          trigger_ai: true,
+          immediate: true,
+          action: 'search_growth_environment_and_adjust'
+        })
+      });
+      if (!resp.ok) {
+        throw new Error('ESP32 /api/plant HTTP ' + resp.status);
+      }
+
+      const data = await resp.json();
+      const appliedTarget =
+        data && typeof data.monitor_target === 'string' && data.monitor_target.trim() ? data.monitor_target.trim() :
+        data && typeof data.target === 'string' && data.target.trim() ? data.target.trim() :
+        data && typeof data.plant === 'string' && data.plant.trim() ? data.plant.trim() :
+        target;
+
+      setCurrentTargetUi(appliedTarget);
+      lastSubmittedTarget = appliedTarget;
+
+      if (oldTarget && oldTarget !== appliedTarget) {
+        resetAllControlSlidersToZero();
+      }
+
+      await forceSmartModeAndZeroControl();
+      await refreshAll();
+      setText('mode_note', '当前监控对象：' + appliedTarget + '，AI 已开始检索适宜生长环境并执行调节。');
+    } catch (err) {
+      console.error('submitTargetToAiAndAdjust error:', err);
+      setText('mode_note', '检测对象提交失败，请检查 ESP32 地址与网络。');
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    const target = e && e.target;
+    if (!target || !target.id) return;
+    if (target.id === 'plant_v2_btn' || target.id === 'plant_target_btn') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      submitTargetToAiAndAdjust();
+    }
+  }, true);
+
+  document.addEventListener('keydown', function(e){
+    if (!e || e.key !== 'Enter') return;
+    const target = e.target;
+    if (!target || !target.id) return;
+    if (target.id === 'plant_v2_input' || target.id === 'plant_target_input') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      submitTargetToAiAndAdjust();
+    }
+  }, true);
+})();
+
+/* ===== 仅追加：只保留一个监控对象输入区 + 中文文案 ===== */
+(function plantTargetSingleUiCnFix(){
+  function applySingleUiCn(){
+    const oldBox = document.querySelector('.plant-box');
+    if (oldBox) oldBox.style.display = 'none';
+
+    const oldPill = document.getElementById('plant_target_pill');
+    if (oldPill) oldPill.style.display = 'none';
+
+    const title = document.querySelector('.plant-v2-title');
+    if (title) title.textContent = '检测对象';
+
+    const input = document.getElementById('plant_v2_input');
+    if (input) input.placeholder = '请输入检测对象（支持中文），例如：桉树、番茄、黄瓜';
+
+    const btn = document.getElementById('plant_v2_btn');
+    if (btn) btn.textContent = '确定监控对象';
+
+    const now = document.getElementById('plant_v2_now');
+    if (now) {
+      const txt = String(now.textContent || '').trim();
+      if (!txt || txt.indexOf('当前监控对象') === -1) {
+        now.innerHTML = '当前监控对象：<b>--</b>';
+      }
+    }
+  }
+
+  applySingleUiCn();
+  setTimeout(applySingleUiCn, 0);
+  setTimeout(applySingleUiCn, 200);
+
+  const observer = new MutationObserver(function(){
+    applySingleUiCn();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
+
+init();
+setInterval(refreshAll, 10000);
+setInterval(loadHistory, 300000);
 </script>
 </body>
 </html>
