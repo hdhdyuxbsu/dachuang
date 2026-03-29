@@ -1312,6 +1312,84 @@ async function init(){
   observer.observe(document.body, { childList: true, subtree: true });
 })();
 
+/* ===== 仅追加：监控对象切换成功/失败提示 ===== */
+(function plantTargetSwitchResultHint(){
+  function ensureResultStyle(){
+    if (document.getElementById('plant_switch_result_style')) return;
+    const style = document.createElement('style');
+    style.id = 'plant_switch_result_style';
+    style.textContent = [
+      '.plant-v2-result{margin-top:8px;font-size:13px;font-weight:700;display:none}',
+      '.plant-v2-result.show{display:block}',
+      '.plant-v2-result.pending{color:#1c7ed6}',
+      '.plant-v2-result.ok{color:#2f9e44}',
+      '.plant-v2-result.fail{color:#e03131}'
+    ].join('');
+    document.head.appendChild(style);
+  }
+
+  function ensureResultNode(){
+    ensureResultStyle();
+    const box = document.getElementById('plant_v2_box');
+    if (!box) return null;
+
+    let result = document.getElementById('plant_v2_result');
+    if (!result) {
+      result = document.createElement('div');
+      result.id = 'plant_v2_result';
+      result.className = 'plant-v2-result';
+      box.appendChild(result);
+    }
+    return result;
+  }
+
+  function setResult(text, state){
+    const el = ensureResultNode();
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'plant-v2-result show ' + state;
+  }
+
+  function classifyFromModeNote(text){
+    const msg = String(text || '').trim();
+    if (!msg) return;
+    if (msg.indexOf('失败') !== -1 || msg.indexOf('错误') !== -1) {
+      setResult('切换失败：' + msg, 'fail');
+      return;
+    }
+    if (msg.indexOf('当前监控对象：') !== -1 || msg.indexOf('已开始检索适宜生长环境') !== -1) {
+      setResult('切换成功：' + msg, 'ok');
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    const t = e && e.target;
+    if (!t || !t.id) return;
+    if (t.id === 'plant_v2_btn' || t.id === 'plant_target_btn') {
+      setResult('正在切换监控对象，请稍候...', 'pending');
+    }
+  }, true);
+
+  document.addEventListener('keydown', function(e){
+    if (!e || e.key !== 'Enter') return;
+    const t = e.target;
+    if (!t || !t.id) return;
+    if (t.id === 'plant_v2_input' || t.id === 'plant_target_input') {
+      setResult('正在切换监控对象，请稍候...', 'pending');
+    }
+  }, true);
+
+  const modeNote = document.getElementById('mode_note');
+  if (modeNote) {
+    const observer = new MutationObserver(function(){
+      classifyFromModeNote(modeNote.textContent);
+    });
+    observer.observe(modeNote, { childList: true, subtree: true, characterData: true });
+  }
+
+  ensureResultNode();
+})();
+
 init();
 setInterval(refreshAll, 10000);
 setInterval(loadHistory, 300000);
