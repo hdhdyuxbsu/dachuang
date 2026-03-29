@@ -213,6 +213,37 @@ body{
   font-size:13px;
   color:var(--muted);
 }
+.manual-panel{
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid var(--line);
+}
+.slider-row{
+  display:grid;
+  grid-template-columns:92px 1fr 74px;
+  gap:12px;
+  align-items:center;
+  margin-top:12px;
+}
+.slider-row label{
+  font-size:14px;
+  color:var(--text);
+  font-weight:700;
+}
+.slider-row input[type="range"]{
+  width:100%;
+}
+.slider-value{
+  text-align:right;
+  font-size:14px;
+  color:var(--muted);
+  font-weight:700;
+}
+.manual-tip{
+  margin-top:12px;
+  font-size:13px;
+  color:var(--muted);
+}
 .tabs{
   display:flex;
   gap:8px;
@@ -385,6 +416,24 @@ body{
         <button class="mode-btn" id="btn_smart" onclick="setControlMode('smart')">切换智能模式</button>
       </div>
       <div class="mode-note" id="mode_note">点击按钮后会通过 ESP32 下发模式切换指令。</div>
+      <div class="manual-panel">
+        <div class="slider-row">
+          <label for="fan_slider">风扇</label>
+          <input id="fan_slider" type="range" min="0" max="100" value="0" oninput="updateManualValue('fan')" onchange="sendManualControl('fan')">
+          <div class="slider-value" id="fan_value">0%</div>
+        </div>
+        <div class="slider-row">
+          <label for="pump_slider">水泵</label>
+          <input id="pump_slider" type="range" min="0" max="100" value="0" oninput="updateManualValue('pump')" onchange="sendManualControl('pump')">
+          <div class="slider-value" id="pump_value">0%</div>
+        </div>
+        <div class="slider-row">
+          <label for="servo_slider">舵机</label>
+          <input id="servo_slider" type="range" min="0" max="180" value="90" oninput="updateManualValue('servo')" onchange="sendManualControl('servo')">
+          <div class="slider-value" id="servo_value">90°</div>
+        </div>
+        <div class="manual-tip" id="manual_tip">人工模式下，拖动滑块后会立即通过 ESP32 下发给 STM32。</div>
+      </div>
     </div>
   </section>
 
@@ -429,6 +478,7 @@ let currentTab = 0;
 let historyCache = {};
 let esp32Base = '';
 let currentMode = '';
+let manualState = { fan: 0, pump: 0, servo: 90 };
 
 const tabConfigs = [
   { ids: ['env_temp', 'soil_temp'], labels: ['环境温度', '土壤温度'], colors: ['#f08c00', '#e03131'] },
@@ -479,6 +529,67 @@ function refreshModeButtons(){
   smartBtn.className = 'mode-btn' + (currentMode === 'smart' ? ' active' : '');
 }
 
+function updateManualValue(key){
+  const slider = document.getElementById(key + '_slider');
+  const value = Number(slider ? slider.value : 0);
+  manualState[key] = value;
+  const suffix = key === 'servo' ? '°' : '%';
+  setText(key + '_value', value + suffix);
+}
+
+function syncManualControls(data){
+  if (data && typeof data.fan === 'number') manualState.fan = data.fan;
+  if (data && typeof data.pump === 'number') manualState.pump = data.pump;
+  if (data && typeof data.servo === 'number') manualState.servo = data.servo;
+
+  const fanSlider = document.getElementById('fan_slider');
+  const pumpSlider = document.getElementById('pump_slider');
+  const servoSlider = document.getElementById('servo_slider');
+  if (fanSlider) fanSlider.value = manualState.fan;
+  if (pumpSlider) pumpSlider.value = manualState.pump;
+  if (servoSlider) servoSlider.value = manualState.servo;
+
+  updateManualValue('fan');
+  updateManualValue('pump');
+  updateManualValue('servo');
+}
+
+async function sendManualControl(source){
+  if (currentMode !== 'manual') {
+    setText('manual_tip', '当前是智能模式，请先切换到人工模式再手动调节。');
+    syncManualControls();
+    return;
+  }
+  if (!esp32Base) {
+    setText('manual_tip', '请先填写 ESP32 地址，再通过滑块下发指令。');
+    return;
+  }
+  try {
+    const resp = await fetch(esp32Base + '/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'manual',
+        fan: manualState.fan,
+        pump: manualState.pump,
+        servo: manualState.servo
+      })
+    });
+    if (!resp.ok) {
+      throw new Error('ESP32 API HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    if (data && typeof data.mode === 'string') currentMode = data.mode;
+    syncManualControls(data);
+    refreshModeButtons();
+    setText('manual_tip', source === 'fan' ? '风扇指令已下发到 STM32。' : source === 'pump' ? '水泵指令已下发到 STM32。' : '舵机指令已下发到 STM32。');
+    await refreshAll();
+  } catch (err) {
+    console.error('sendManualControl error:', err);
+    setText('manual_tip', '手动控制下发失败，请检查 ESP32 地址和网络连接。');
+  }
+}
+
 async function setControlMode(mode){
   if (!esp32Base) {
     setText('mode_note', '请先填写 ESP32 地址，再切换模式。');
@@ -496,6 +607,11 @@ async function setControlMode(mode){
     const data = await resp.json();
     currentMode = data && typeof data.mode === 'string' ? data.mode : mode;
     refreshModeButtons();
+    if (currentMode === 'manual') {
+      setText('manual_tip', '已切换到人工模式，现在拖动滑块即可下发到 STM32。');
+    } else {
+      setText('manual_tip', '当前是智能模式，滑块不会手动下发。');
+    }
     setText('mode_note', currentMode === 'smart' ? '已切换到智能模式。' : '已切换到人工模式。');
     await refreshAll();
   } catch (err) {
@@ -624,9 +740,11 @@ function updateDashboard(resp, esp32Data){
   setPanelText('alert_text', alertText, '当前未检测到明显异常');
   setPanelText('ai_reply_text', aiReply, 'ESP32 暂未返回大模型回复');
   currentMode = mode;
+  syncManualControls(esp32Data);
   setText('mode_name', mode === 'smart' ? '智能' : mode === 'manual' ? '人工' : String(mode));
   setText('reason_text', String(reason));
   refreshModeButtons();
+  setText('manual_tip', currentMode === 'manual' ? '人工模式下，拖动滑块后会立即通过 ESP32 下发给 STM32。' : '当前是智能模式，滑块不会手动下发。');
 
   document.getElementById('dot').className = 'dot on';
   setText('status_text', esp32Data ? 'OneNet 在线 / ESP32 已连接' : 'OneNet 在线 / ESP32 未连接');
