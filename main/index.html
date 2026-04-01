@@ -317,7 +317,7 @@ body{
 <div class="page">
   <header class="hero">
     <h1>智慧农业监测平台</h1>
-    <p>传感器数据与趋势图来自 OneNet，异常与 AI 回复直接来自 ESP32</p>
+    <p>页面数据优先来自 OneNet，ESP32 主要负责本地控制与兜底</p>
     <div class="status">
       <span class="dot" id="dot"></span>
       <span id="status_text">正在连接...</span>
@@ -325,9 +325,9 @@ body{
       <span class="pill" id="source_text">需填ESP32地址</span>
     </div>
     <div class="api-box">
-      <input class="api-input" id="esp32_base" placeholder="ESP32 地址，例如 http://10.62.25.1">
+      <input class="api-input" id="esp32_base" placeholder="ESP32 网关地址，例如 https://your-worker.workers.dev/esp32">
       <button class="api-btn" onclick="saveEsp32Base()">连接 ESP32</button>
-      <div class="api-tip">如果网页部署在 GitHub Pages，请填写开发板的局域网地址。也可在链接后追加 `?esp32=http://10.62.25.1`。</div>
+      <div class="api-tip">公网部署建议填写 Worker 网关地址（如 https://your-worker.workers.dev/esp32）；也可在链接后追加 ?esp32=网关地址。</div>
     </div>
   </header>
 
@@ -382,7 +382,7 @@ body{
       <span class="badge">诊断</span>
       <div>
         <div class="section-title">异常与 AI 信息</div>
-        <div class="section-sub">直接读取 ESP32 `/api/data` 返回的 `alert` 和 `ai_reply` 字段</div>
+        <div class="section-sub">优先读取 OneNet 属性，缺失时回退到 ESP32 `/api/data`</div>
       </div>
     </div>
     <div class="grid grid-2">
@@ -402,7 +402,7 @@ body{
       <span class="badge">状态</span>
       <div>
         <div class="section-title">平台状态</div>
-        <div class="section-sub">控制模式、最近策略与更新时间来自 ESP32</div>
+        <div class="section-sub">控制信息优先来自 OneNet，ESP32 用于控制下发与校验</div>
       </div>
     </div>
     <div class="card">
@@ -716,6 +716,25 @@ function buildAlertText(values){
   return alerts.length ? alerts.join('；') : '当前未检测到明显异常';
 }
 
+function pickNumericValue(values, keys){
+  for (const key of keys) {
+    const num = Number(values[key]);
+    if (Number.isFinite(num)) return num;
+  }
+  return NaN;
+}
+
+function pickTextValue(values, keys){
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(values, key)) continue;
+    const raw = values[key];
+    if (raw === null || raw === undefined) continue;
+    const text = String(raw).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
 function updateDashboard(resp, esp32Data){
   const values = parseMapFromLatestResponse(resp);
   setText('lux', toFixedSafe(values.lux, 1));
@@ -729,10 +748,30 @@ function updateDashboard(resp, esp32Data){
   setText('p', Number.isFinite(Number(values.p)) ? Math.round(Number(values.p)) : '--');
   setText('k', Number.isFinite(Number(values.k)) ? Math.round(Number(values.k)) : '--');
 
-  const alertText = esp32Data && typeof esp32Data.alert === 'string' ? esp32Data.alert : buildAlertText(values);
-  const aiReply = esp32Data && typeof esp32Data.ai_reply === 'string' ? esp32Data.ai_reply : '';
-  const mode = esp32Data && typeof esp32Data.mode === 'string' ? esp32Data.mode : '--';
-  const reason = esp32Data && typeof esp32Data.reason === 'string' ? esp32Data.reason : 'ESP32 暂未返回控制策略';
+  const alertText = pickTextValue(values, ['alert']) ||
+    (esp32Data && typeof esp32Data.alert === 'string' ? esp32Data.alert : buildAlertText(values));
+  const aiReply = pickTextValue(values, ['ai_reply']) ||
+    (esp32Data && typeof esp32Data.ai_reply === 'string' ? esp32Data.ai_reply : '');
+  const mode = pickTextValue(values, ['mode', 'control_mode']) ||
+    (esp32Data && typeof esp32Data.mode === 'string' ? esp32Data.mode : '--');
+  const reason = pickTextValue(values, ['reason']) ||
+    (esp32Data && typeof esp32Data.reason === 'string' ? esp32Data.reason : 'OneNet 暂未返回控制策略');
+
+  const cloudFan = pickNumericValue(values, ['fan']);
+  const cloudPump = pickNumericValue(values, ['pump']);
+  const cloudServo = pickNumericValue(values, ['servo']);
+  const mergedControl = {
+    fan: Number.isFinite(cloudFan)
+      ? Math.round(cloudFan)
+      : (esp32Data && typeof esp32Data.fan === 'number' ? esp32Data.fan : manualState.fan),
+    pump: Number.isFinite(cloudPump)
+      ? Math.round(cloudPump)
+      : (esp32Data && typeof esp32Data.pump === 'number' ? esp32Data.pump : manualState.pump),
+    servo: Number.isFinite(cloudServo)
+      ? Math.round(cloudServo)
+      : (esp32Data && typeof esp32Data.servo === 'number' ? esp32Data.servo : manualState.servo)
+  };
+
   const updatedText = esp32Data && typeof esp32Data.updated === 'number' && esp32Data.updated > 0
     ? new Date(esp32Data.updated * 1000).toLocaleString('zh-CN')
     : new Date().toLocaleString('zh-CN');
@@ -740,7 +779,7 @@ function updateDashboard(resp, esp32Data){
   setPanelText('alert_text', alertText, '当前未检测到明显异常');
   setPanelText('ai_reply_text', aiReply, 'ESP32 暂未返回大模型回复');
   currentMode = mode;
-  syncManualControls(esp32Data);
+  syncManualControls(mergedControl);
   setText('mode_name', mode === 'smart' ? '智能' : mode === 'manual' ? '人工' : String(mode));
   setText('reason_text', String(reason));
   refreshModeButtons();
