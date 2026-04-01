@@ -484,11 +484,16 @@ let currentMode = '';
 let manualState = { fan: 0, pump: 0, servo: 90 };
 
 const tabConfigs = [
-  { ids: ['env_temp', 'soil_temp'], labels: ['环境温度', '土壤温度'], colors: ['#f08c00', '#e03131'] },
-  { ids: ['env_humi', 'soil_humi'], labels: ['环境湿度', '土壤湿度'], colors: ['#1c7ed6', '#2f9e44'] },
-  { ids: ['lux'], labels: ['光照强度'], colors: ['#f59f00'] },
-  { ids: ['ph'], labels: ['酸碱度'], colors: ['#0b7285'] }
+  { ids: ['env_temp', 'soil_temp'], labels: ['Env Temp', 'Soil Temp'], colors: ['#f08c00', '#e03131'] },
+  { ids: ['env_humi', 'soil_humi'], labels: ['Env Humi', 'Soil Humi'], colors: ['#1c7ed6', '#2f9e44'] },
+  { ids: ['lux'], labels: ['Lux'], colors: ['#f59f00'] },
+  { ids: ['ph'], labels: ['pH'], colors: ['#0b7285'] }
 ];
+
+setTimeout(function(){
+  const loader = document.getElementById('loader');
+  if (loader) loader.classList.add('hide');
+}, LOADER_FAILSAFE_MS);
 
 async function fetchWithTimeout(url, options, timeoutMs){
   const controller = new AbortController();
@@ -940,6 +945,16 @@ async function init(){
     if (loaderEl) loaderEl.classList.add('hide');
   }
 }
+
+let appBooted = false;
+function bootApp(){
+  if (appBooted) return;
+  appBooted = true;
+  init();
+  setInterval(refreshAll, 10000);
+  setInterval(loadHistory, 300000);
+}
+bootApp();
 
 /* ===== 仅追加：监控对象输入与显示增强 ===== */
 (function plantTargetEnhancement(){
@@ -1459,10 +1474,6 @@ async function init(){
 
   ensureResultNode();
 })();
-
-init();
-setInterval(refreshAll, 10000);
-setInterval(loadHistory, 300000);
 </script>
 </body>
 </html>
