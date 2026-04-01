@@ -464,7 +464,6 @@ body{
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 const ONENET_PRODUCT_ID = 'W9BY3SlO8w';
 const ONENET_DEVICE_NAME = 'dachuang';
@@ -474,6 +473,11 @@ const ONENET_ET = '2057492169';
 const ONENET_TIMEOUT_MS = 10000;
 const ESP32_TIMEOUT_MS = 5000;
 const LOADER_FAILSAFE_MS = 15000;
+const CHART_LOAD_TIMEOUT_MS = 5000;
+const CHART_CDN_URLS = [
+  'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
+  'https://unpkg.com/chart.js@4/dist/chart.umd.min.js'
+];
 
 let cachedToken = null;
 let chart = null;
@@ -489,6 +493,63 @@ const tabConfigs = [
   { ids: ['lux'], labels: ['Lux'], colors: ['#f59f00'] },
   { ids: ['ph'], labels: ['pH'], colors: ['#0b7285'] }
 ];
+
+let chartReady = false;
+
+function loadScriptWithTimeout(url, timeoutMs){
+  return new Promise(function(resolve, reject){
+    const existed = document.querySelector('script[data-chart-src="' + url + '"]');
+    if (existed) {
+      const onLoad = function(){ resolve(); };
+      const onError = function(){ reject(new Error('script load failed')); };
+      existed.addEventListener('load', onLoad, { once: true });
+      existed.addEventListener('error', onError, { once: true });
+      setTimeout(function(){ reject(new Error('script load timeout')); }, timeoutMs);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    script.setAttribute('data-chart-src', url);
+
+    const timer = setTimeout(function(){
+      reject(new Error('script load timeout'));
+    }, timeoutMs);
+
+    script.onload = function(){
+      clearTimeout(timer);
+      resolve();
+    };
+    script.onerror = function(){
+      clearTimeout(timer);
+      reject(new Error('script load failed'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureChartReady(){
+  if (typeof window.Chart !== 'undefined') {
+    chartReady = true;
+    return true;
+  }
+
+  for (const url of CHART_CDN_URLS) {
+    try {
+      await loadScriptWithTimeout(url, CHART_LOAD_TIMEOUT_MS);
+      if (typeof window.Chart !== 'undefined') {
+        chartReady = true;
+        return true;
+      }
+    } catch (err) {
+      console.warn('Chart CDN load failed:', url, err);
+    }
+  }
+
+  chartReady = false;
+  return false;
+}
 
 setTimeout(function(){
   const loader = document.getElementById('loader');
@@ -821,6 +882,10 @@ function formatLabel(ts){
 }
 
 function renderChart(){
+  if (!chartReady || typeof window.Chart === 'undefined') {
+    return;
+  }
+
   const cfg = tabConfigs[currentTab];
   const datasets = [];
   let labels = [];
@@ -937,6 +1002,7 @@ async function init(){
   loadEsp32Base();
   await refreshAll();
   try {
+    await ensureChartReady();
     await loadHistory();
   } catch (err) {
     console.error('loadHistory failed:', err);
